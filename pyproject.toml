@@ -1,0 +1,116 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+
+[project]
+name = "rec_loader" # you'll be able to pip install this name
+version = "1.0.0"
+# Who is an author or a maintainer ? There's no official definition.
+authors = [
+  { name = "Matthieu Perez", email = "matthieu.perez@college-de-france.fr" },
+]
+maintainers = [
+  { name = "Matthieu Perez", email = "matthieu.perez@college-de-france.fr" },
+]
+description = "Load MultiTracker files"
+readme = "README.md" # The long description is in this file
+requires-python = ">=3.8" # best if only minimal version is specified
+
+# list of valid classifiers: https://pypi.org/classifiers/
+#  At least put:
+#  - which version(s) of Python your package works on,
+#  - which operating systems your package will work on.
+#  - which license your package is available under,
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Scientific/Engineering",
+  "Typing :: Typed",
+]
+
+# The project packages requirements
+dependencies = ["numpy"]
+
+# Optional installations
+[project.optional-dependencies]
+# For the test environment
+test = ["pytest >=6", "pytest-cov >=3"]
+# For actively developping the package
+dev = ["rec_loader[test]", "pipx", "nox", "mypy"]
+
+[project.urls]
+Homepage = "https://gitlab.college-de-france.fr/virtualembryo/embryo-pip"
+"Bug Tracker" = "https://gitlab.college-de-france.fr/virtualembryo/embryo-pip/issues"
+Discussions = "https://gitlab.college-de-france.fr/virtualembryo/embryo-pip/discussions"
+Changelog = "https://gitlab.college-de-france.fr/virtualembryo/embryo-pip/releases"
+[tool.hatch]
+envs.default.dependencies = ["pytest", "pytest-cov"]
+
+[tool.flake8]
+extend-ignore = [
+  "E501", # Line too long
+]
+extend-select = [ # Extensions
+]
+exclude = [ # ignore these files
+  "tests/*",
+  "noxfile.py",
+  ".venv/*",
+  ".nox/*",
+]
+max-complexity = 10
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+# 'extend-exclude' excludes files or directories in addition to the defaults
+extend-exclude = '''
+# A regex preceded with ^/ will apply only to files and directories
+# in the root of the project.
+(
+  ^/.nox/*  # one per line
+)
+'''
+
+[tool.isort]
+profile = "black"
+
+[tool.mypy]
+files = "src"
+python_version = "3.8"
+warn_unused_configs = true
+strict = true
+show_error_codes = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+warn_unreachable = true
+
+[tool.check-manifest]
+ignore = [".pre-commit-config.yaml", "noxfile.py"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
+xfail_strict = true
+filterwarnings = ["error"]
+log_cli_level = "INFO"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+omit = []
+
+[tool.codespell]
+skip = '*.po,*.ts'
+count = ''
+quiet-level = 3

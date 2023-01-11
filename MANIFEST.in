@@ -1,0 +1,6 @@
+# The MANIFEST.in is used to say to pip to copy the files listed inside the package when installed.
+graft src
+graft tests
+
+include LICENSE README.md pyproject.toml
+global-exclude __pycache__ *.py[cod] .*
