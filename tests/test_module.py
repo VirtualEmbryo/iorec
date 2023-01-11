@@ -1,7 +1,10 @@
-import rec_loader
-import pytest
-import numpy as np
 from pathlib import Path
+import pytest
+
+import numpy as np
+
+import rec_loader
+
 
 def test_binary_file():
     points, triangles, labels = rec_loader.open_rec(Path("tests/assets/binary.rec"))

@@ -85,11 +85,8 @@ def _open_text_rec_file(filename: Path):
 
 def _is_binary(file_name: Path):
     try:
-        with open(file_name, 'tr') as check_file:  # try open file in text mode
-            check_file.read()
+        with open(file_name, 'r', encoding='utf-8') as f:
+            f.read()
             return False
-    except IOError as fee:
-        print(fee)
-        raise
-    except:  # noqa # if fail then file is non-text (binary).. Not perfect but should work in most cases
+    except UnicodeDecodeError:
         return True
