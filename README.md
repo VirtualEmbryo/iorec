@@ -18,6 +18,7 @@ points, triangles, labels = rec_loader.open_rec("file.rec")
 
 # or with a pathlib.Path :
 from pathlib import Path
+
 points, triangles, labels = rec_loader.open_rec(Path("file.rec"))
 
 # points: np.array of shape (num_points, 3) (float64)

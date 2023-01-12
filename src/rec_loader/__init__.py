@@ -12,10 +12,14 @@ Define one function: open_rec
 """
 import struct
 from pathlib import Path
-import numpy as np
+from typing import Tuple, Union
+
+import numpy as np  # type: ignore[import]
 
 
-def open_rec(filename: str | Path) -> tuple[np.array, np.array, np.array] | ValueError | FileNotFoundError:
+def open_rec(
+    filename: Union[str, Path],
+) -> Union[Tuple[np.array, np.array, np.array], ValueError, FileNotFoundError]:
     """Read a MultiTracker file.
 
     Args:
@@ -40,52 +44,57 @@ def open_rec(filename: str | Path) -> tuple[np.array, np.array, np.array] | Valu
         raise ValueError(f"{filename} is not a .rec or .arec file.")
 
 
-def _open_rec_file(filename: Path):
+def _open_rec_file(filename: Path) -> Tuple[np.array, np.array, np.array]:
     if _is_binary(filename):
         return _open_binary_rec_file(filename)
     else:
         return _open_text_rec_file(filename)
 
 
-def _open_binary_rec_file(filename: Path):
-    with open(filename, 'rb') as f:
+def _open_binary_rec_file(filename: Path) -> Tuple[np.array, np.array, np.array]:
+    with open(filename, "rb") as f:
         # First we read the number of vertices
-        number_of_points, = struct.unpack('Q', f.read(8))
+        (number_of_points,) = struct.unpack("Q", f.read(8))
         # Then we read the vertices : they are in a 3D space
-        points = np.fromfile(f, count=3 * number_of_points,
-                             dtype=np.float64).reshape((number_of_points, 3))
+        points = np.fromfile(f, count=3 * number_of_points, dtype=np.float64).reshape(
+            (number_of_points, 3)
+        )
 
         # Number of triangles
-        number_of_triangles, = struct.unpack('Q', f.read(8))
+        (number_of_triangles,) = struct.unpack("Q", f.read(8))
         # Each line defines a triangle and 2 regions labels
         dtype_triangles_and_labels = np.dtype(
-            [('triangles', np.uint64, (3,)), ('labels', np.uint64, (2,))])
+            [("triangles", np.uint64, (3,)), ("labels", np.uint64, (2,))]
+        )
         triangles_and_labels = np.fromfile(
-            f, count=number_of_triangles, dtype=dtype_triangles_and_labels)
+            f, count=number_of_triangles, dtype=dtype_triangles_and_labels
+        )
 
-    return (points, triangles_and_labels['triangles'], triangles_and_labels['labels'])
+    return (points, triangles_and_labels["triangles"], triangles_and_labels["labels"])
 
 
-def _open_text_rec_file(filename: Path):
-    with open(filename, 'r') as f:
+def _open_text_rec_file(filename: Path) -> Tuple[np.array, np.array, np.array]:
+    with open(filename) as f:
         # First we read the number of vertices
         number_of_points = int(f.readline().strip())
         # Then we read the vertices : they are in a 3D space
         points = np.fromfile(
-            f, count=3 * number_of_points, sep="\n", dtype=np.float64).reshape((number_of_points, 3))
+            f, count=3 * number_of_points, sep="\n", dtype=np.float64
+        ).reshape((number_of_points, 3))
 
         # Number of triangles
         number_of_triangles = int(f.readline().strip())
         # Each line defines a triangle and 2 regions labels
         triangles_and_labels = np.fromfile(
-            f, count=5 * number_of_triangles, sep="\n", dtype=np.uint64).reshape((number_of_triangles, 5))
+            f, count=5 * number_of_triangles, sep="\n", dtype=np.uint64
+        ).reshape((number_of_triangles, 5))
 
     return (points, triangles_and_labels[:, 0:3], triangles_and_labels[:, 3:5])
 
 
-def _is_binary(file_name: Path):
+def _is_binary(file_name: Path) -> bool:
     try:
-        with open(file_name, 'r', encoding='utf-8') as f:
+        with open(file_name, encoding="utf-8") as f:
             f.read()
             return False
     except UnicodeDecodeError:
