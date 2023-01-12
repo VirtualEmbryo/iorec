@@ -87,7 +87,7 @@ def build(session: nox.Session) -> None:
 @nox.session
 def publish(session: nox.Session) -> None:
     """Publish the built packages on the gitlab repository.
-    You must have a gitlab entry in your ~/.pypirc with access tokens for the package registy.
+    You must have a gitlab entry in your ~/.pypirc with access tokens for the package registry.
     """
     dist_dir = DIR.joinpath("dist")
     if not dist_dir.exists():
