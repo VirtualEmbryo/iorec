@@ -70,7 +70,7 @@ def check_manifest(session: nox.Session) -> None:
 DIR = Path(__file__).parent.resolve()
 
 
-@nox.session(python=["3.10", "3.11"])
+@nox.session(python=["3.8", "3.9", "3.10", "3.11"])
 def build(session: nox.Session) -> None:
     """
     (build) Build an SDist and wheel, locally.
@@ -82,6 +82,19 @@ def build(session: nox.Session) -> None:
 
     session.install("build")
     session.run("python", "-m", "build")
+
+
+@nox.session
+def publish(session: nox.Session) -> None:
+    """Publish the built packages on the gitlab repository.
+    You must have a gitlab entry in your ~/.pypirc with access tokens for the package registy.
+    """
+    dist_dir = DIR.joinpath("dist")
+    if not dist_dir.exists():
+        print(dist_dir.resolve(), "not found, have you built the package ?")
+    else:
+        session.install("twine")
+        session.run("twine", "upload", "--repository", "gitlab", "dist/*")
 
 
 @nox.session(python=False)
