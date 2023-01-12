@@ -97,20 +97,24 @@ def publish(session: nox.Session) -> None:
         session.run("twine", "upload", "--repository", "gitlab", "dist/*")
 
 
-@nox.session(python=False)
+@nox.session
 def requirements(session: nox.Session) -> None:
     """Generate a requirements.txt file."""
+    session.install(".")
+    session.install("pipdeptree")
     session.run(
         "sh",
         "-c",
-        r"pipx run pipdeptree -f --warn silence | grep -E '^[a-zA-Z0-9\-]+' | tee requirements.txt",
+        r"pipdeptree -f --warn silence | grep -E '^[a-zA-Z0-9\-]+' | tee requirements.txt",
     )
 
 
-@nox.session(python=False)
+@nox.session
 def lock_file(session: nox.Session) -> None:
     """Generate a locked-requirements.txt file."""
-    session.run("sh", "-c", "pipx run pipdeptree -f | tee locked-requirements.txt")
+    session.install(".")
+    session.install("pipdeptree")
+    session.run("sh", "-c", "pipdeptree -f | tee locked-requirements.txt")
 
 
 @nox.session(python=False)
