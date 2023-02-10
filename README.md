@@ -4,7 +4,7 @@ Small utility to load .rec files from MultiTracker.
 
 ## Installation
 
-`pip install -i https://gitlab.college-de-france.fr/virtualembryo/embryo-pip rec_loader`
+`embryo-pip pip install rec_loader`
 
 ## Usage
 
