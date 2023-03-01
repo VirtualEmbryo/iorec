@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 import numpy as np
@@ -14,8 +16,11 @@ def test_binary_file():
     assert labels.dtype == np.uint64
 
     assert points.shape == (8137, 3)
-    assert triangles.shape == (13600, 3)
-    assert labels.shape == (13600, 2)
+    assert triangles.shape == (17000, 3)
+    assert labels.shape == (17000, 2)
+
+    assert np.max(triangles) == 8136  # all points used in this examples
+    assert np.max(labels) == 16  # 16 cells + exterior
 
 
 def test_text_file():
@@ -28,6 +33,9 @@ def test_text_file():
     assert points.shape == (142, 3)
     assert triangles.shape == (318, 3)
     assert labels.shape == (318, 2)
+
+    assert np.max(triangles) == 141  # all points used in this examples
+    assert np.max(labels) == 4  # 4 cells + exterior
 
 
 def test_non_existing_file():
