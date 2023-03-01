@@ -43,8 +43,7 @@ def test_non_existing_file():
         rec_loader.open_rec("tests/assets/NOT_A_FILE.rec")
 
     assert (
-        exc_info.value.args[0]
-        == f"{Path('tests/assets/NOT_A_FILE.rec').resolve()} not found."
+        exc_info.value.args[0] == f"{Path('tests/assets/NOT_A_FILE.rec').resolve()} not found."
     )
 
 
@@ -53,6 +52,5 @@ def test_non_rec_file():
         rec_loader.open_rec("tests/assets/README.md")
 
     assert (
-        exc_info.value.args[0]
-        == f"{Path('tests/assets/README.md').resolve()} is not a .rec or .arec file."
+        exc_info.value.args[0] == f"{Path('tests/assets/README.md').resolve()} is not a .rec or .arec file."
     )

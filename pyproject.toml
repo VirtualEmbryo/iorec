@@ -5,7 +5,7 @@
 
 [project]
   name = "rec_loader" # you'll be able to pip install this name
-  version = "1.0.1"
+  version = "1.0.2"
   # Who is an author or a maintainer ? There's no official definition.
   authors = [{ name = "Matthieu Perez", email = "matthieu.perez@college-de-france.fr" }]
   maintainers = [
