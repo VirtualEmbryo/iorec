@@ -12,8 +12,8 @@ def test_binary_file():
     points, triangles, labels = rec_loader.open_rec("tests/assets/binary.rec")
 
     assert points.dtype == np.float64
-    assert triangles.dtype == np.uint64
-    assert labels.dtype == np.uint64
+    assert triangles.dtype == np.ulonglong
+    assert labels.dtype == np.uint
 
     assert points.shape == (8137, 3)
     assert triangles.shape == (17000, 3)
@@ -27,8 +27,8 @@ def test_text_file():
     points, triangles, labels = rec_loader.open_rec("tests/assets/text.rec")
 
     assert points.dtype == np.float64
-    assert triangles.dtype == np.uint64
-    assert labels.dtype == np.uint64
+    assert triangles.dtype == np.ulonglong
+    assert labels.dtype == np.uint
 
     assert points.shape == (142, 3)
     assert triangles.shape == (318, 3)

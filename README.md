@@ -22,8 +22,8 @@ from pathlib import Path
 points, triangles, labels = rec_loader.open_rec(Path("file.rec"))
 
 # points: np.array of shape (num_points, 3) (float64)
-# triangles: np.array of shape (num_triangles, 3) (uint64)
-# labels: np.array of shape (num_triangles, 2) (uint64)
+# triangles: np.array of shape (num_triangles, 3) (ulonglong)
+# labels: np.array of shape (num_triangles, 2) (uint)
 
 # If you give a file that does not exist, it raises a FileNotFoundError:
 rec_loader.open_rec("NOT_AN_EXISTING_FILE.rec")  # raises FileNotFoundError

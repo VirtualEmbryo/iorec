@@ -5,8 +5,8 @@ Define one function: open_rec
     - filename: str
 - Output
     - points: np.array of shape (num_points, 3) (float64)
-    - triangles: np.array of shape (num_triangles, 3) (uint64)
-    - labels: np.array of shape (num_triangles, 2) (uint64)
+    - triangles: np.array of shape (num_triangles, 3) (ulonglong)
+    - labels: np.array of shape (num_triangles, 2) (uint)
 - Raises
     - ValueError if the filename is not a .rec or . arec file.
 """
@@ -33,8 +33,8 @@ def open_rec(
     Returns:
         tuple[np.array, np.array, np.array]: (points, triangles, labels), with:
         - points: np.array of shape (num_points, 3) (float64)
-        - triangles: np.array of shape (num_triangles, 3) (uint64)
-        - labels: np.array of shape (num_triangles, 2) (uint64)
+        - triangles: np.array of shape (num_triangles, 3) (ulonglong)
+        - labels: np.array of shape (num_triangles, 2) (uint)
     """
     filename = Path(filename).resolve()
     if not filename.exists():
@@ -73,8 +73,8 @@ def _open_binary_rec_file(filename: Path) -> tuple[np.array, np.array, np.array]
 
     return (
         points,
-        triangles_and_labels["triangles"].astype(np.uint64),
-        triangles_and_labels["labels"].astype(np.uint64),
+        triangles_and_labels["triangles"].astype(np.ulonglong),
+        triangles_and_labels["labels"].astype(np.uint),
     )
 
 
@@ -94,7 +94,7 @@ def _open_text_rec_file(filename: Path) -> tuple[np.array, np.array, np.array]:
             f, count=5 * number_of_triangles, sep="\n", dtype=np.uint64
         ).reshape((number_of_triangles, 5))
 
-    return (points, triangles_and_labels[:, 0:3], triangles_and_labels[:, 3:5])
+    return (points, triangles_and_labels[:, 0:3].astype(np.ulonglong), triangles_and_labels[:, 3:5].astype(np.uint))
 
 
 def _is_binary(file_name: Path) -> bool:
