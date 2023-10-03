@@ -20,7 +20,7 @@ import numpy as np  # type: ignore[import]
 
 def open_rec(
     filename: str | Path,
-) -> tuple[np.array, np.array, np.array] | ValueError | FileNotFoundError:
+) -> tuple[np.array, np.array, np.array]:
     """Read a MultiTracker file.
 
     Args:
@@ -57,19 +57,13 @@ def _open_binary_rec_file(filename: Path) -> tuple[np.array, np.array, np.array]
         # First we read the number of vertices
         (number_of_points,) = struct.unpack("Q", f.read(8))
         # Then we read the vertices : they are in a 3D space
-        points = np.fromfile(f, count=3 * number_of_points, dtype=np.float64).reshape(
-            (number_of_points, 3)
-        )
+        points = np.fromfile(f, count=3 * number_of_points, dtype=np.float64).reshape((number_of_points, 3))
 
         # Number of triangles
         (number_of_triangles,) = struct.unpack("Q", f.read(8))
         # Each line defines a triangle and 2 regions labels
-        dtype_triangles_and_labels = np.dtype(
-            [("triangles", np.int64, (3,)), ("labels", np.int32, (2,))]
-        )
-        triangles_and_labels = np.fromfile(
-            f, count=number_of_triangles, dtype=dtype_triangles_and_labels
-        )
+        dtype_triangles_and_labels = np.dtype([("triangles", np.int64, (3,)), ("labels", np.int32, (2,))])
+        triangles_and_labels = np.fromfile(f, count=number_of_triangles, dtype=dtype_triangles_and_labels)
 
     return (
         points,
@@ -83,16 +77,14 @@ def _open_text_rec_file(filename: Path) -> tuple[np.array, np.array, np.array]:
         # First we read the number of vertices
         number_of_points = int(f.readline().strip())
         # Then we read the vertices : they are in a 3D space
-        points = np.fromfile(
-            f, count=3 * number_of_points, sep="\n", dtype=np.float64
-        ).reshape((number_of_points, 3))
+        points = np.fromfile(f, count=3 * number_of_points, sep="\n", dtype=np.float64).reshape((number_of_points, 3))
 
         # Number of triangles
         number_of_triangles = int(f.readline().strip())
         # Each line defines a triangle and 2 regions labels
-        triangles_and_labels = np.fromfile(
-            f, count=5 * number_of_triangles, sep="\n", dtype=np.uint64
-        ).reshape((number_of_triangles, 5))
+        triangles_and_labels = np.fromfile(f, count=5 * number_of_triangles, sep="\n", dtype=np.uint64).reshape(
+            (number_of_triangles, 5)
+        )
 
     return (points, triangles_and_labels[:, 0:3].astype(np.ulonglong), triangles_and_labels[:, 3:5].astype(np.uint))
 
