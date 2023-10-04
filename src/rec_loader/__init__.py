@@ -15,12 +15,13 @@ from __future__ import annotations
 import struct
 from pathlib import Path
 
-import numpy as np  # type: ignore[import]
+import numpy as np
+from numpy.typing import NDArray
 
 
 def open_rec(
     filename: str | Path,
-) -> tuple[np.array, np.array, np.array]:
+) -> tuple[NDArray[np.float64], NDArray[np.ulonglong], NDArray[np.uint]]:
     """Read a MultiTracker file.
 
     Args:
@@ -45,14 +46,14 @@ def open_rec(
         raise ValueError(f"{filename} is not a .rec or .arec file.")
 
 
-def _open_rec_file(filename: Path) -> tuple[np.array, np.array, np.array]:
+def _open_rec_file(filename: Path) -> tuple[NDArray[np.float64], NDArray[np.ulonglong], NDArray[np.uint]]:
     if _is_binary(filename):
         return _open_binary_rec_file(filename)
     else:
         return _open_text_rec_file(filename)
 
 
-def _open_binary_rec_file(filename: Path) -> tuple[np.array, np.array, np.array]:
+def _open_binary_rec_file(filename: Path) -> tuple[NDArray[np.float64], NDArray[np.ulonglong], NDArray[np.uint]]:
     with open(filename, "rb") as f:
         # First we read the number of vertices
         (number_of_points,) = struct.unpack("Q", f.read(8))
@@ -72,7 +73,7 @@ def _open_binary_rec_file(filename: Path) -> tuple[np.array, np.array, np.array]
     )
 
 
-def _open_text_rec_file(filename: Path) -> tuple[np.array, np.array, np.array]:
+def _open_text_rec_file(filename: Path) -> tuple[NDArray[np.float64], NDArray[np.ulonglong], NDArray[np.uint]]:
     with open(filename) as f:
         # First we read the number of vertices
         number_of_points = int(f.readline().strip())
