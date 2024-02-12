@@ -39,32 +39,44 @@ def open_rec(
     """
     filename = Path(filename).resolve()
     if not filename.exists():
-        raise FileNotFoundError(f"{filename} not found.")
+        error = f"{filename} not found."
+        raise FileNotFoundError(error)
     if filename.suffix == ".rec" or filename.suffix == ".arec":
         return _open_rec_file(filename)
     else:
-        raise ValueError(f"{filename} is not a .rec or .arec file.")
+        error = f"{filename} is not a .rec or .arec file."
+        raise ValueError(error)
 
 
-def _open_rec_file(filename: Path) -> tuple[NDArray[np.float64], NDArray[np.ulonglong], NDArray[np.uint]]:
+def _open_rec_file(
+    filename: Path,
+) -> tuple[NDArray[np.float64], NDArray[np.ulonglong], NDArray[np.uint]]:
     if _is_binary(filename):
         return _open_binary_rec_file(filename)
     else:
         return _open_text_rec_file(filename)
 
 
-def _open_binary_rec_file(filename: Path) -> tuple[NDArray[np.float64], NDArray[np.ulonglong], NDArray[np.uint]]:
-    with open(filename, "rb") as f:
+def _open_binary_rec_file(
+    filename: Path,
+) -> tuple[NDArray[np.float64], NDArray[np.ulonglong], NDArray[np.uint]]:
+    with Path.open(filename, "rb") as f:
         # First we read the number of vertices
         (number_of_points,) = struct.unpack("Q", f.read(8))
         # Then we read the vertices : they are in a 3D space
-        points = np.fromfile(f, count=3 * number_of_points, dtype=np.float64).reshape((number_of_points, 3))
+        points = np.fromfile(f, count=3 * number_of_points, dtype=np.float64).reshape(
+            (number_of_points, 3)
+        )
 
         # Number of triangles
         (number_of_triangles,) = struct.unpack("Q", f.read(8))
         # Each line defines a triangle and 2 regions labels
-        dtype_triangles_and_labels = np.dtype([("triangles", np.int64, (3,)), ("labels", np.int32, (2,))])
-        triangles_and_labels = np.fromfile(f, count=number_of_triangles, dtype=dtype_triangles_and_labels)
+        dtype_triangles_and_labels = np.dtype(
+            [("triangles", np.int64, (3,)), ("labels", np.int32, (2,))]
+        )
+        triangles_and_labels = np.fromfile(
+            f, count=number_of_triangles, dtype=dtype_triangles_and_labels
+        )
 
     return (
         points,
@@ -73,26 +85,36 @@ def _open_binary_rec_file(filename: Path) -> tuple[NDArray[np.float64], NDArray[
     )
 
 
-def _open_text_rec_file(filename: Path) -> tuple[NDArray[np.float64], NDArray[np.ulonglong], NDArray[np.uint]]:
-    with open(filename) as f:
+def _open_text_rec_file(
+    filename: Path,
+) -> tuple[NDArray[np.float64], NDArray[np.ulonglong], NDArray[np.uint]]:
+    with Path.open(filename) as f:
         # First we read the number of vertices
         number_of_points = int(f.readline().strip())
         # Then we read the vertices : they are in a 3D space
-        points = np.fromfile(f, count=3 * number_of_points, sep="\n", dtype=np.float64).reshape((number_of_points, 3))
+        points = np.fromfile(
+            f, count=3 * number_of_points, sep="\n", dtype=np.float64
+        ).reshape((number_of_points, 3))
 
         # Number of triangles
         number_of_triangles = int(f.readline().strip())
         # Each line defines a triangle and 2 regions labels
-        triangles_and_labels = np.fromfile(f, count=5 * number_of_triangles, sep="\n", dtype=np.uint64).reshape(
-            (number_of_triangles, 5)
+        triangles_and_labels = np.fromfile(
+            f, count=5 * number_of_triangles, sep="\n", dtype=np.uint64
+        ).reshape(
+            (number_of_triangles, 5),
         )
 
-    return (points, triangles_and_labels[:, 0:3].astype(np.ulonglong), triangles_and_labels[:, 3:5].astype(np.uint))
+    return (
+        points,
+        triangles_and_labels[:, 0:3].astype(np.ulonglong),
+        triangles_and_labels[:, 3:5].astype(np.uint),
+    )
 
 
 def _is_binary(file_name: Path) -> bool:
     try:
-        with open(file_name, encoding="utf-8") as f:
+        with Path.open(file_name, encoding="utf-8") as f:
             f.read()
             return False
     except UnicodeDecodeError:
