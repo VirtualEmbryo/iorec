@@ -1,15 +1,16 @@
+"""Test file for the package."""
 from __future__ import annotations
 
 from pathlib import Path
 
+import iorec
 import numpy as np
 import pytest
 
-import rec_loader
 
-
-def test_binary_file():
-    points, triangles, labels = rec_loader.open_rec("tests/assets/binary.rec")
+def test_load_binary_file() -> None:
+    """One can load a binary rec mesh file."""
+    points, triangles, labels = iorec.load_rec("tests/assets/binary.rec")
 
     assert points.dtype == np.float64
     assert triangles.dtype == np.ulonglong
@@ -23,8 +24,9 @@ def test_binary_file():
     assert np.max(labels) == 16  # 16 cells + exterior
 
 
-def test_text_file():
-    points, triangles, labels = rec_loader.open_rec("tests/assets/text.rec")
+def test_text_file() -> None:
+    """One can load a text rec mesh file."""
+    points, triangles, labels = iorec.load_rec("tests/assets/text.rec")
 
     assert points.dtype == np.float64
     assert triangles.dtype == np.ulonglong
@@ -38,19 +40,51 @@ def test_text_file():
     assert np.max(labels) == 4  # 4 cells + exterior
 
 
-def test_non_existing_file():
+def test_load_non_existing_file() -> None:
+    """Loading a non existing file raises a FileNotFoundError."""
     with pytest.raises(FileNotFoundError) as exc_info:
-        rec_loader.open_rec("tests/assets/NOT_A_FILE.rec")
+        iorec.load_rec("tests/assets/NOT_A_FILE.rec")
 
     assert (
-        exc_info.value.args[0] == f"{Path('tests/assets/NOT_A_FILE.rec').resolve()} not found."
+        exc_info.value.args[0]
+        == f"{Path('tests/assets/NOT_A_FILE.rec').resolve()} not found."
     )
 
 
-def test_non_rec_file():
-    with pytest.raises(ValueError) as exc_info:
-        rec_loader.open_rec("tests/assets/README.md")
+def test_load_non_rec_file() -> None:
+    """Load a non-rec file raises a ValueError."""
+    with pytest.raises(ValueError, match="not a .rec or .arec file") as exc_info:
+        iorec.load_rec("tests/assets/README.md")
 
     assert (
-        exc_info.value.args[0] == f"{Path('tests/assets/README.md').resolve()} is not a .rec or .arec file."
+        exc_info.value.args[0]
+        == f"{Path('tests/assets/README.md').resolve()} is not a .rec or .arec file."
     )
+
+
+def test_load_save_load_binary(tmp_path: Path) -> None:
+    """One can save numpy arrays of points, triangles and labels into a .rec file."""
+    filename = tmp_path / "bin.rec"
+    points, triangles, labels = iorec.load_rec("tests/assets/binary.rec")
+
+    iorec.save_rec(filename, points, triangles, labels, binary_mode=True)
+
+    saved_points, saved_triangles, saved_labels = iorec.load_rec(filename)
+
+    assert np.array_equal(points, saved_points)
+    assert np.array_equal(triangles, saved_triangles)
+    assert np.array_equal(labels, saved_labels)
+
+
+def test_load_save_load_text(tmp_path: Path) -> None:
+    """One can save numpy arrays of points, triangles and labels into a .rec file."""
+    filename = tmp_path / "txt.rec"
+    points, triangles, labels = iorec.load_rec("tests/assets/text.rec")
+
+    iorec.save_rec(filename, points, triangles, labels, binary_mode=False)
+
+    saved_points, saved_triangles, saved_labels = iorec.load_rec(filename)
+
+    assert np.array_equal(points, saved_points)
+    assert np.array_equal(triangles, saved_triangles)
+    assert np.array_equal(labels, saved_labels)

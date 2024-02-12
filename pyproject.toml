@@ -4,18 +4,14 @@ build-backend = "hatchling.build"
 
 
 [project]
-name = "rec_loader" # you'll be able to pip install this name
-version = "1.0.3"
+name = "iorec"    # you'll be able to pip install this name
+version = "1.0.4"
 # Who is an author or a maintainer ? There's no official definition.
-authors = [
-  { name = "Matthieu Perez", email = "matthieu.perez@college-de-france.fr" },
-]
-maintainers = [
-  { name = "Matthieu Perez", email = "matthieu.perez@college-de-france.fr" },
-]
-description = "Load MultiTracker files"
-readme = "README.md" # The long description is in this file
-requires-python = ">=3.8" # best if only minimal version is specified
+authors = [{ name = "Matthieu Perez", email = "matthieu.perez@college-de-france.fr" }]
+maintainers = [{ name = "Matthieu Perez", email = "matthieu.perez@college-de-france.fr" }]
+description = "Load and save .rec mesh files"
+readme = "README.md"                                                                       # The long description is in this file
+requires-python = ">=3.8"                                                                  # best if only minimal version is specified
 
 # list of valid classifiers: https://pypi.org/classifiers/
 #  At least put:
@@ -47,13 +43,13 @@ dependencies = ["numpy"]
 # For the test environment
 test = ["pytest >=6", "pytest-cov >=3"]
 # For actively developping the package
-dev = ["rec_loader[test]", "pipx", "nox", "mypy"]
+dev = ["iorec[test]", "pipx", "nox", "mypy"]
 
 [project.urls]
-Homepage = "https://gitlab.college-de-france.fr/virtualembryo/embryo-pip"
-"Bug Tracker" = "https://gitlab.college-de-france.fr/virtualembryo/embryo-pip/issues"
-Discussions = "https://gitlab.college-de-france.fr/virtualembryo/embryo-pip/discussions"
-Changelog = "https://gitlab.college-de-france.fr/virtualembryo/embryo-pip/releases"
+Homepage = "https://gitlab.college-de-france.fr/virtualembryo/iorec"
+"Bug Tracker" = "https://gitlab.college-de-france.fr/virtualembryo/iorec/issues"
+Discussions = "https://gitlab.college-de-france.fr/virtualembryo/iorec/discussions"
+Changelog = "https://gitlab.college-de-france.fr/virtualembryo/iorec/releases"
 [tool.hatch]
 envs.default.dependencies = ["pytest", "pytest-cov"]
 
@@ -70,6 +66,81 @@ exclude = [ # ignore these files
   ".nox/*",
 ]
 max-complexity = 10
+
+[tool.ruff]
+# Enable the pycodestyle (`E`) and Pyflakes (`F`) rules by default.
+# Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
+# McCabe complexity (`C901`) by default.
+select = [
+  "E",
+  "F",
+  "W",
+  "C90",
+  "I",
+  "N",
+  "D",
+  "UP",
+  "ANN",
+  "S",
+  "B",
+  "A",
+  "COM",
+  # "CPY",
+  "C4",
+  "EM",
+  "EXE",
+  "FA",
+  "ISC",
+  # "INP",
+  "PT",
+  "Q",
+  "SIM",
+  "ARG",
+  "PTH",
+  "NPY",
+  "PERF",
+  "RUF",
+]
+ignore = ["S101", "ANN10"]
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+# Exclude a variety of commonly ignored directories.
+exclude = [
+  ".bzr",
+  ".direnv",
+  ".eggs",
+  ".git",
+  ".git-rewrite",
+  ".hg",
+  ".mypy_cache",
+  ".nox",
+  ".pants.d",
+  ".pytype",
+  ".ruff_cache",
+  ".svn",
+  ".tox",
+  ".venv",
+  "__pypackages__",
+  "_build",
+  "buck-out",
+  "build",
+  "dist",
+  "node_modules",
+  "venv",
+  "*.pyi",
+]
+per-file-ignores = {}
+
+line-length = 88
+
+target-version = "py38"
+
+[tool.ruff.pydocstyle]
+convention = "google"
+
 
 [tool.black]
 line-length = 88
