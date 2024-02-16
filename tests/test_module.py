@@ -13,8 +13,8 @@ def test_load_binary_file() -> None:
     points, triangles, labels = iorec.load_rec("tests/assets/binary.rec")
 
     assert points.dtype == np.float64
-    assert triangles.dtype == np.ulonglong
-    assert labels.dtype == np.uint
+    assert triangles.dtype == np.int64
+    assert labels.dtype == np.int64
 
     assert points.shape == (8137, 3)
     assert triangles.shape == (17000, 3)
@@ -29,8 +29,8 @@ def test_text_file() -> None:
     points, triangles, labels = iorec.load_rec("tests/assets/text.rec")
 
     assert points.dtype == np.float64
-    assert triangles.dtype == np.ulonglong
-    assert labels.dtype == np.uint
+    assert triangles.dtype == np.int64
+    assert labels.dtype == np.int64
 
     assert points.shape == (142, 3)
     assert triangles.shape == (318, 3)

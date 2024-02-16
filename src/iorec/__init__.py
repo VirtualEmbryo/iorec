@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 
 def load_rec(
     filename: str | Path,
-) -> tuple[NDArray[np.float64], NDArray[np.ulonglong], NDArray[np.uint]]:
+) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
     """Read a rec mesh file.
 
     Args:
@@ -40,7 +40,7 @@ def load_rec(
 
 def _load_rec_file(
     filename: Path,
-) -> tuple[NDArray[np.float64], NDArray[np.ulonglong], NDArray[np.uint]]:
+) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
     if _is_binary(filename):
         return _load_binary_rec_file(filename)
     else:
@@ -49,7 +49,7 @@ def _load_rec_file(
 
 def _load_binary_rec_file(
     filename: Path,
-) -> tuple[NDArray[np.float64], NDArray[np.ulonglong], NDArray[np.uint]]:
+) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
     with Path.open(filename, "rb") as f:
         # First we read the number of vertices
         (number_of_points,) = struct.unpack("Q", f.read(8))
@@ -72,14 +72,14 @@ def _load_binary_rec_file(
 
     return (
         points,
-        triangles_and_labels["triangles"].astype(np.ulonglong),
-        triangles_and_labels["labels"].astype(np.uint),
+        triangles_and_labels["triangles"].astype(np.int64),
+        triangles_and_labels["labels"].astype(np.int64),
     )
 
 
 def _load_text_rec_file(
     filename: Path,
-) -> tuple[NDArray[np.float64], NDArray[np.ulonglong], NDArray[np.uint]]:
+) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
     with Path.open(filename) as f:
         # First we read the number of vertices
         number_of_points = int(f.readline().strip())
@@ -98,15 +98,15 @@ def _load_text_rec_file(
             f,
             count=5 * number_of_triangles,
             sep="\n",
-            dtype=np.uint64,
+            dtype=np.int64,
         ).reshape(
             (number_of_triangles, 5),
         )
 
     return (
         points,
-        triangles_and_labels[:, 0:3].astype(np.ulonglong),
-        triangles_and_labels[:, 3:5].astype(np.uint),
+        triangles_and_labels[:, 0:3].astype(np.int64),
+        triangles_and_labels[:, 3:5].astype(np.int64),
     )
 
 
@@ -122,8 +122,8 @@ def _is_binary(file_name: Path) -> bool:
 def save_rec(
     filename: str | Path,
     points: NDArray[np.float64],
-    triangles: NDArray[np.ulonglong],
-    labels: NDArray[np.uint],
+    triangles: NDArray[np.int64],
+    labels: NDArray[np.int64],
     binary_mode: bool = False,
 ) -> None:
     """Save a rec mesh file at filename. Binary or text mode are available.
@@ -133,8 +133,8 @@ def save_rec(
     Args:
         filename (str | Path): where to save the mesh file.
         points (NDArray[np.float64]): Mesh points.
-        triangles (NDArray[np.ulonglong]): Mesh triangles (topology).
-        labels (NDArray[np.uint]): Triangles multimaterial labels.
+        triangles (NDArray[np.int64]): Mesh triangles (topology).
+        labels (NDArray[np.int64]): Triangles multimaterial labels.
         binary_mode (bool, optional): Choose binary mode. Defaults to False.
     """
     if binary_mode:
@@ -146,8 +146,8 @@ def save_rec(
 def _save_rec_binary(
     filename: str | Path,
     points: NDArray[np.float64],
-    triangles: NDArray[np.ulonglong],
-    labels: NDArray[np.uint],
+    triangles: NDArray[np.int64],
+    labels: NDArray[np.int64],
 ) -> None:
     """Save a rec file at filename. Binary only."""
     bytes_content = struct.pack("Q", len(points))
@@ -158,7 +158,7 @@ def _save_rec_binary(
     def map_tri_labels_func(
         i: int,
     ) -> tuple[Any, Any]:
-        # -> tuple[np.ulonglong, np.ulonglong, np.ulonglong, np.uint, np.uint]:
+        # -> tuple[np.int64, np.int64, np.int64, np.int64, np.int64]:
         return triangles[i], labels[i]
 
     triangles_and_labels = np.fromiter(
@@ -175,8 +175,8 @@ def _save_rec_binary(
 def _save_rec_text(
     filename: str | Path,
     points: NDArray[np.float64],
-    triangles: NDArray[np.ulonglong],
-    labels: NDArray[np.uint],
+    triangles: NDArray[np.int64],
+    labels: NDArray[np.int64],
 ) -> None:
     """Save a rec file at filename. Text only."""
     content = ""
