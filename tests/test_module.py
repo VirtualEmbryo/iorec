@@ -1,4 +1,5 @@
 """Test file for the package."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -87,4 +88,34 @@ def test_load_save_load_text(tmp_path: Path) -> None:
 
     assert np.array_equal(points, saved_points)
     assert np.array_equal(triangles, saved_triangles)
+    assert np.array_equal(labels, saved_labels)
+
+
+def test_load_save_load_2d_text(tmp_path: Path) -> None:
+    """One can save numpy arrays of points, segments and labels into a 2D .rec file."""
+    filename = tmp_path / "txt2d.rec"
+    points, segments, labels = iorec.load_2d_rec("tests/assets/text_2d.rec")
+
+    iorec.save_2d_rec(filename, points, segments, labels, binary_mode=False)
+
+    saved_points, saved_segments, saved_labels = iorec.load_2d_rec(filename)
+
+    assert np.array_equal(points, saved_points)
+    assert np.array_equal(segments, saved_segments)
+    assert np.array_equal(labels, saved_labels)
+
+
+def test_load_save_load_2d_binary(tmp_path: Path) -> None:
+    """One can save numpy arrays of points, segments and labels into a 2D .rec file."""
+    filename = tmp_path / "bin2d.rec"
+    points, segments, labels = iorec.load_2d_rec("tests/assets/binary_2d.rec")
+
+    iorec.save_2d_rec(filename, points, segments, labels, binary_mode=True)
+
+    print("SAVED DONE")
+
+    saved_points, saved_segments, saved_labels = iorec.load_2d_rec(filename)
+
+    assert np.array_equal(points, saved_points)
+    assert np.array_equal(segments, saved_segments)
     assert np.array_equal(labels, saved_labels)
