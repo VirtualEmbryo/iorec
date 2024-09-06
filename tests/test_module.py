@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import iorec
 import numpy as np
 import pytest
+
+import iorec
 
 
 def test_load_binary_file() -> None:
@@ -111,8 +112,6 @@ def test_load_save_load_2d_binary(tmp_path: Path) -> None:
     points, segments, labels = iorec.load_2d_rec("tests/assets/binary_2d.rec")
 
     iorec.save_2d_rec(filename, points, segments, labels, binary_mode=True)
-
-    print("SAVED DONE")
 
     saved_points, saved_segments, saved_labels = iorec.load_2d_rec(filename)
 

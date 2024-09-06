@@ -2,17 +2,31 @@
 
 Small utility to load and save .rec mesh files from MultiTracker.
 
+It works with both 3D and 2D .rec meshes.
+
 ## Installation
 
-`embryo-pip install iorec`
+`uv add iorec` if you have configured uv,
+
+or
+
+`embryo-pip install iorec` if you have installed embryo-pip the old way.
 
 ## Usage
 
-There's two function: 
+There's four function: 
+
+For 3D .rec meshes:
+- iorec.load_rec()
+- iorec.save_rec()
+
+For 2D .rec meshes:
+- iorec.load_2d_rec()
+- iorec.save_2d_rec()
 
 ### load_rec
 
-Load a .rec file into three numpy arrays of points, triangles and multi-material labels.
+Load a 3D .rec file into three numpy arrays of points, triangles and multi-material labels.
 
 The file can be in binary or text mode.
 
@@ -69,5 +83,36 @@ saved_points, saved_triangles, saved_labels = iorec.load_rec(filename)
 
 assert np.array_equal(points, saved_points)
 assert np.array_equal(triangles, saved_triangles)
+assert np.array_equal(labels, saved_labels)
+```
+
+
+### load_2d_rec
+
+Similar to load_rec in 3D. See its documentation.
+
+```python
+import iorec
+points, segments, labels = iorec.load_2d_rec("tests/assets/text_2d.rec")
+```
+
+
+### save_2d_rec
+
+Similar to save_rec in 3D. See its documentation.
+
+```python
+import iorec
+
+# or arrays from your own code, of course !
+points, segments, labels = iorec.load_rec("tests/assets/text.rec")
+
+filename = "txt2d.rec"
+iorec.save_2d_rec(filename, points, segments, labels, binary_mode=False)
+
+saved_points, saved_segments, saved_labels = iorec.load_2d_rec(filename)
+
+assert np.array_equal(points, saved_points)
+assert np.array_equal(segments, saved_segments)
 assert np.array_equal(labels, saved_labels)
 ```
