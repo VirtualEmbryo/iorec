@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "iorec"    # you'll be able to pip install this name
-version = "1.0.6"
+version = "1.0.7"
 # Who is an author or a maintainer ? There's no official definition.
 authors = [{ name = "Matthieu Perez", email = "matthieu.perez@cnrs.fr" }]
 maintainers = [{ name = "Matthieu Perez", email = "matthieu.perez@cnrs.fr" }]
