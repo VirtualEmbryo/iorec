@@ -7,8 +7,8 @@ build-backend = "hatchling.build"
 name = "iorec"    # you'll be able to pip install this name
 version = "1.0.6"
 # Who is an author or a maintainer ? There's no official definition.
-authors = [{ name = "Matthieu Perez", email = "matthieu.perez@college-de-france.fr" }]
-maintainers = [{ name = "Matthieu Perez", email = "matthieu.perez@college-de-france.fr" }]
+authors = [{ name = "Matthieu Perez", email = "matthieu.perez@cnrs.fr" }]
+maintainers = [{ name = "Matthieu Perez", email = "matthieu.perez@cnrs.fr" }]
 description = "Load and save .rec mesh files"
 readme = "README.md"                                                                       # The long description is in this file
 requires-python = ">=3.8"                                                                  # best if only minimal version is specified
@@ -46,10 +46,10 @@ test = ["pytest >=6", "pytest-cov >=3"]
 dev = ["iorec[test]", "pipx", "nox", "mypy"]
 
 [project.urls]
-Homepage = "https://gitlab.college-de-france.fr/virtualembryo/iorec"
-"Bug Tracker" = "https://gitlab.college-de-france.fr/virtualembryo/iorec/issues"
-Discussions = "https://gitlab.college-de-france.fr/virtualembryo/iorec/discussions"
-Changelog = "https://gitlab.college-de-france.fr/virtualembryo/iorec/releases"
+Homepage = "https://src.koda.cnrs.fr/turlierlab/iorec"
+"Bug Tracker" = "https://src.koda.cnrs.fr/turlierlab/iorec/issues"
+Discussions = "https://src.koda.cnrs.fr/turlierlab/iorec/discussions"
+Changelog = "https://src.koda.cnrs.fr/turlierlab/iorec/releases"
 [tool.hatch]
 envs.default.dependencies = ["pytest", "pytest-cov"]
 

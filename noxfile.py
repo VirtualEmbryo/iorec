@@ -77,9 +77,9 @@ def build(session: nox.Session) -> None:
 
 @nox.session
 def publish(session: nox.Session) -> None:
-    """Publish the built packages on the gitlab repository.
+    """Publish the built packages on the koda repository.
 
-    You must have a gitlab entry in your ~/.pypirc
+    You must have a koda entry in your ~/.pypirc
     with access tokens for the package registry.
     """
     dist_dir = DIR.joinpath("dist")
@@ -87,7 +87,7 @@ def publish(session: nox.Session) -> None:
         print(dist_dir.resolve(), "not found, have you built the package ?")
     else:
         session.install("twine")
-        session.run("twine", "upload", "--repository", "gitlab", "dist/*")
+        session.run("twine", "upload", "--repository", "koda", "dist/*")
 
 
 @nox.session
