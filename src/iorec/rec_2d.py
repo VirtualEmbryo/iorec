@@ -82,27 +82,23 @@ def _load_2d_text_rec_file(
     filename: Path,
 ) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
     with Path.open(filename) as f:
-        tokens = f.read().split()
+        # First we read the number of vertices
+        number_of_points = int(f.readline().strip())
+        # Then we read the vertices : they are in a 2D space
+        points = (
+            np.loadtxt(f, max_rows=number_of_points, dtype=np.float64, ndmin=2)
+            if number_of_points > 0
+            else np.empty((0, 2), dtype=np.float64)
+        )
 
-    idx = 0
-    number_of_points = int(tokens[idx])
-    idx += 1
-    number_of_point_values = 2 * number_of_points
-    points = np.array(
-        tokens[idx : idx + number_of_point_values],
-        dtype=np.float64,
-    ).reshape((number_of_points, 2))
-    idx += number_of_point_values
-
-    # Number of segments
-    number_of_segments = int(tokens[idx])
-    idx += 1
-    number_of_segment_values = 4 * number_of_segments
-    # Each line defines a segment and 2 regions labels
-    segments_and_labels = np.array(
-        tokens[idx : idx + number_of_segment_values],
-        dtype=np.int64,
-    ).reshape((number_of_segments, 4))
+        # Number of segments
+        number_of_segments = int(f.readline().strip())
+        # Each line defines a segment and 2 regions labels
+        segments_and_labels = (
+            np.loadtxt(f, max_rows=number_of_segments, dtype=np.int64, ndmin=2)
+            if number_of_segments > 0
+            else np.empty((0, 4), dtype=np.int64)
+        )
 
     return (
         points,
