@@ -69,7 +69,7 @@ def write_rec_appendix(metadata: dict[str, Any], *, written_by: str) -> bytes:
     return ("\n".join(lines) + "\n").encode("ascii")
 
 
-def parse_rec_appendix(block_text: str) -> dict[str, Any]:
+def _parse_rec_appendix(block_text: str) -> dict[str, Any]:
     """Parse a `.rec`/`.arec` metadata appendix block into a dict.
 
     Args:
@@ -129,8 +129,8 @@ def load_rec_appendix(filename: str | Path) -> dict[str, Any] | None:
         FileNotFoundError: if the file doesn't exist.
 
     Returns:
-        dict[str, Any] | None: the parsed appendix fields (see `parse_rec_appendix`), or
-        `None` if the file has no appendix. A `None` return must be treated by the
+        dict[str, Any] | None: the parsed appendix fields (see `_parse_rec_appendix`),
+        or `None` if the file has no appendix. A `None` return must be treated by the
         caller as "no information at all" -- e.g. never as isotropic/unit spacing --
         since every file saved before this feature existed has no appendix.
     """
@@ -142,7 +142,7 @@ def load_rec_appendix(filename: str | Path) -> dict[str, Any] | None:
     idx = raw.rfind(_appendix_marker())
     if idx == -1:
         return None
-    return parse_rec_appendix(raw[idx:].decode("ascii"))
+    return _parse_rec_appendix(raw[idx:].decode("ascii"))
 
 
 def _split_rec_bytes(raw: bytes) -> tuple[bytes, dict[str, Any] | None]:
@@ -163,4 +163,4 @@ def _split_rec_bytes(raw: bytes) -> tuple[bytes, dict[str, Any] | None]:
     idx = raw.rfind(_appendix_marker())
     if idx == -1:
         return raw, None
-    return raw[:idx], parse_rec_appendix(raw[idx:].decode("ascii"))
+    return raw[:idx], _parse_rec_appendix(raw[idx:].decode("ascii"))

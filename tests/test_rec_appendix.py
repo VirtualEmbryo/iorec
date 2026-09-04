@@ -8,11 +8,11 @@ import numpy as np
 import pytest
 
 import iorec
-from iorec.rec_appendix import parse_rec_appendix, write_rec_appendix
+from iorec.rec_appendix import _parse_rec_appendix, write_rec_appendix
 
 
 def test_write_parse_round_trip() -> None:
-    """write_rec_appendix/parse_rec_appendix round trip all field kinds."""
+    """write_rec_appendix/_parse_rec_appendix round trip all field kinds."""
     metadata = {
         "coordinate_frame": "voxel_index",
         "source_shape": (194, 200, 199),
@@ -22,7 +22,7 @@ def test_write_parse_round_trip() -> None:
     }
 
     block = write_rec_appendix(metadata, written_by="test 0.0.0")
-    parsed = parse_rec_appendix(block.decode("ascii"))
+    parsed = _parse_rec_appendix(block.decode("ascii"))
 
     assert parsed["_version"] == 1
     assert parsed["written_by"] == "test 0.0.0"
@@ -59,7 +59,7 @@ def test_write_rec_appendix_drops_reserved_keys() -> None:
 
     assert block.count(b"written_by") == 1
     assert b"_version" not in block
-    parsed = parse_rec_appendix(block.decode("ascii"))
+    parsed = _parse_rec_appendix(block.decode("ascii"))
     assert parsed["_version"] == 1
     assert parsed["written_by"] == "test 0.0.0"
     assert parsed["spacing_unit"] == "um"

@@ -10,18 +10,13 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from iorec.rec_appendix import _iorec_version, _split_rec_bytes, write_rec_appendix
-
-
-def _resolve_2d_rec_path(filename: str | Path) -> Path:
-    filename = Path(filename).resolve()
-    if not filename.exists():
-        error = f"{filename} not found."
-        raise FileNotFoundError(error)
-    if filename.suffix not in (".rec", ".arec"):
-        error = f"{filename} is not a .rec or .arec file."
-        raise ValueError(error)
-    return filename
+from iorec._utils import (
+    _is_binary,
+    _is_binary_bytes,
+    _resolve_rec_path,
+    _write_geometry_with_appendix,
+)
+from iorec.rec_appendix import _split_rec_bytes
 
 
 def load_2d_rec(
@@ -42,7 +37,7 @@ def load_2d_rec(
         - segments: np.array of shape (num_segments, 2) (ulonglong)
         - labels: np.array of shape (num_segments, 2) (uint)
     """
-    filename = _resolve_2d_rec_path(filename)
+    filename = _resolve_rec_path(filename)
     return _load_2d_rec_file(filename)
 
 
@@ -72,7 +67,7 @@ def load_2d_rec_with_metadata(
         metadata), with points/segments/labels as in `load_2d_rec`, and metadata as in
         `load_rec_appendix` (`None` if the file has no appendix).
     """
-    filename = _resolve_2d_rec_path(filename)
+    filename = _resolve_rec_path(filename)
     geometry_bytes, metadata = _split_rec_bytes(filename.read_bytes())
 
     if _is_binary_bytes(geometry_bytes):
@@ -149,15 +144,6 @@ def _load_2d_text_rec_file(
         segments_and_labels[:, 0:2],
         segments_and_labels[:, 2:4],
     )
-
-
-def _is_binary_bytes(data: bytes, chunk_size: int = 64) -> bool:
-    return b"\x00" in data[:chunk_size]
-
-
-def _is_binary(file_name: Path, chunk_size: int = 64) -> bool:
-    with Path.open(file_name, "rb") as f:
-        return _is_binary_bytes(f.read(chunk_size), chunk_size)
 
 
 def _parse_2d_binary_rec_bytes(
@@ -260,20 +246,14 @@ def save_2d_rec(
             supplied, a trailing metadata appendix is appended after the geometry data;
             see `iorec.rec_appendix.write_rec_appendix`.
     """
-    appendix_bytes = (
-        write_rec_appendix(metadata, written_by=_iorec_version())
-        if metadata is not None
-        else None
-    )
 
-    if binary_mode:
-        _save_2d_rec_binary(filename, points, segments, labels)
-    else:
-        _save_2d_rec_text(filename, points, segments, labels)
+    def write_geometry() -> None:
+        if binary_mode:
+            _save_2d_rec_binary(filename, points, segments, labels)
+        else:
+            _save_2d_rec_text(filename, points, segments, labels)
 
-    if appendix_bytes is not None:
-        with Path(filename).open("ab") as file:
-            file.write(appendix_bytes)
+    _write_geometry_with_appendix(filename, write_geometry, metadata)
 
 
 def _save_2d_rec_binary(
