@@ -163,8 +163,10 @@ def _is_binary(file_name: Path, chunk_size: int = 64) -> bool:
 def _parse_binary_rec_bytes(
     data: bytes,
 ) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
-    """Parse geometry from an in-memory buffer, e.g. the geometry half of a buffer
-    already split by `iorec.rec_appendix._split_rec_bytes`.
+    """Parse geometry from an in-memory buffer.
+
+    E.g. the geometry half of a buffer already split by
+    `iorec.rec_appendix._split_rec_bytes`.
 
     Kept separate from `_load_binary_rec_file` (which streams from disk with
     `np.fromfile`) rather than unifying the two: unifying would make plain `load_rec`
@@ -204,8 +206,10 @@ def _parse_binary_rec_bytes(
 def _parse_text_rec_bytes(
     data: bytes,
 ) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
-    """Parse geometry from an in-memory buffer. See `_parse_binary_rec_bytes` for why
-    this is kept separate from `_load_text_rec_file` rather than unifying the two.
+    """Parse geometry from an in-memory buffer.
+
+    See `_parse_binary_rec_bytes` for why this is kept separate from
+    `_load_text_rec_file` rather than unifying the two.
     """
     with io.StringIO(data.decode()) as f:
         number_of_points = int(f.readline().strip())
@@ -290,7 +294,7 @@ def _save_rec_binary(
         return triangles[i], labels[i]
 
     triangles_and_labels = np.fromiter(
-        (map_tri_labels_func(xi) for xi in np.arange(len(triangles))),
+        (map_tri_labels_func(xi) for xi in range(len(triangles))),
         dtype=dt,
         count=len(triangles),
     )

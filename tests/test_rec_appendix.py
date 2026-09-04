@@ -34,8 +34,9 @@ def test_write_parse_round_trip() -> None:
 
 
 def test_write_rec_appendix_pins_wire_format() -> None:
-    """The wire format is pinned to an exact byte layout, independent of the installed
-    package version.
+    """The wire format is pinned to an exact byte layout.
+
+    Independent of the installed package version.
     """
     metadata = {"coordinate_frame": "physical", "spacing": (1.0, 0.5)}
 
@@ -287,8 +288,10 @@ def test_load_rec_with_metadata_reads_file_once(
     binary_mode: bool,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """load_rec_with_metadata reads the file exactly once, unlike calling load_rec and
-    load_rec_appendix separately (which would each read the whole file on their own).
+    """load_rec_with_metadata reads the file exactly once.
+
+    Unlike calling load_rec and load_rec_appendix separately, which would each read
+    the whole file on their own.
     """
     points, triangles, labels = _mesh_3d()
     filename = tmp_path / "mesh.rec"
@@ -326,8 +329,9 @@ def test_load_2d_rec_with_metadata_reads_file_once(
     binary_mode: bool,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """load_2d_rec_with_metadata reads the file exactly once, unlike calling
-    load_2d_rec and load_rec_appendix separately.
+    """load_2d_rec_with_metadata reads the file exactly once.
+
+    Unlike calling load_2d_rec and load_rec_appendix separately.
     """
     points, segments, labels = _mesh_2d()
     filename = tmp_path / "mesh2d.rec"

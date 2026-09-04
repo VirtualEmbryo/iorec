@@ -55,7 +55,7 @@ def test_load_non_existing_file() -> None:
 
 def test_load_non_rec_file() -> None:
     """Load a non-rec file raises a ValueError."""
-    with pytest.raises(ValueError, match="not a .rec or .arec file") as exc_info:
+    with pytest.raises(ValueError, match=r"not a \.rec or \.arec file") as exc_info:
         iorec.load_rec("tests/assets/README.md")
 
     assert (
