@@ -24,6 +24,9 @@ For 2D .rec meshes:
 - iorec.load_2d_rec()
 - iorec.save_2d_rec()
 
+Plus one for the optional metadata appendix (see below), shared by both 2D and 3D:
+- iorec.load_rec_appendix()
+
 ### load_rec
 
 Load a 3D .rec file into three numpy arrays of points, triangles and multi-material labels.
@@ -116,3 +119,56 @@ assert np.array_equal(points, saved_points)
 assert np.array_equal(segments, saved_segments)
 assert np.array_equal(labels, saved_labels)
 ```
+
+### `.rec` / `.arec` metadata appendix
+
+`save_rec`/`save_2d_rec` can optionally attach a small metadata appendix to a
+`.rec`/`.arec` file: pass a `metadata={...}` dict, and read it back later with
+`iorec.load_rec_appendix(filename)`.
+
+The appendix is a trailing block of ASCII `# key = value` lines, written after the
+geometry data — never before it, because every reader (this one included, in both text
+and binary mode) reads a count and then exactly that many values, so a trailing block is
+invisible to it, while a leading one would break parsing outright:
+
+```
+# rec-appendix 1
+# written_by = iorec <version>
+# coordinate_frame = voxel_index
+# axis_order = zyx
+# spacing = 1.0 0.325 0.325
+# spacing_unit = um
+# source_shape = 194 200 199
+# crop_offset = 0 0 0
+```
+
+The fields above are illustrative, not exhaustive — `metadata` accepts any keys.
+`spacing`, `source_shape`, and `crop_offset` are parsed back as tuples of `float`/`int`
+if present; any other key round-trips as a raw string.
+
+```python
+import iorec
+
+iorec.save_rec(
+    "mesh.rec",
+    points,
+    triangles,
+    labels,
+    metadata={"coordinate_frame": "voxel_index", "spacing": (1.0, 0.325, 0.325)},
+)
+
+metadata = iorec.load_rec_appendix("mesh.rec")
+# metadata == {"_version": 1, "written_by": "iorec <version>",
+#              "coordinate_frame": "voxel_index", "spacing": (1.0, 0.325, 0.325)}
+```
+
+**A file with no appendix must be treated as carrying no metadata at all** —
+`load_rec_appendix` returns `None` in that case, and every file saved before this
+feature existed (or without a `metadata` argument) has no appendix. In particular,
+`None` must never be treated as "isotropic/default spacing" or any other default value.
+
+Metadata values must be ASCII — a non-ASCII value raises before anything is written to
+disk. The `written_by`/`_version` keys are reserved for the appendix's own bookkeeping:
+they are ignored if present in a `metadata` dict you pass in, so a dict returned by
+`load_rec_appendix` can be fed straight back into `save_rec`/`save_2d_rec` without
+duplicating or corrupting them.

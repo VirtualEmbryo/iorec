@@ -9,6 +9,8 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+from iorec.rec_appendix import _iorec_version, write_rec_appendix
+
 
 def load_2d_rec(
     filename: str | Path,
@@ -118,6 +120,8 @@ def save_2d_rec(
     segments: NDArray[np.int64],
     labels: NDArray[np.int64],
     binary_mode: bool = False,
+    *,
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     """Save a 2D rec mesh file at filename. Binary or text mode are available.
 
@@ -129,11 +133,27 @@ def save_2d_rec(
         segments (NDArray[np.int64]): Mesh segments (topology).
         labels (NDArray[np.int64]): Segments multimaterial labels.
         binary_mode (bool, optional): Choose binary mode. Defaults to False.
+        metadata (dict[str, Any] | None, optional): appendix fields, e.g.
+            `coordinate_frame`, `axis_order`, `spacing`, `spacing_unit`,
+            `source_shape`, `crop_offset`. Defaults to `None`, which writes nothing
+            extra -- byte-for-byte the same file as before this option existed. When
+            supplied, a trailing metadata appendix is appended after the geometry data;
+            see `iorec.rec_appendix.write_rec_appendix`.
     """
+    appendix_bytes = (
+        write_rec_appendix(metadata, written_by=_iorec_version())
+        if metadata is not None
+        else None
+    )
+
     if binary_mode:
         _save_2d_rec_binary(filename, points, segments, labels)
     else:
         _save_2d_rec_text(filename, points, segments, labels)
+
+    if appendix_bytes is not None:
+        with Path(filename).open("ab") as file:
+            file.write(appendix_bytes)
 
 
 def _save_2d_rec_binary(

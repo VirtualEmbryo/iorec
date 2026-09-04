@@ -1,0 +1,206 @@
+"""Test file for the .rec/.arec metadata appendix."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+import iorec
+from iorec.rec_appendix import parse_rec_appendix, write_rec_appendix
+
+
+def test_write_parse_round_trip() -> None:
+    """write_rec_appendix/parse_rec_appendix round trip all field kinds."""
+    metadata = {
+        "coordinate_frame": "voxel_index",
+        "source_shape": (194, 200, 199),
+        "crop_offset": (0, 0, 0),
+        "spacing": (1.0, 0.325, 0.325),
+        "some_unknown_field": "kept-as-string",
+    }
+
+    block = write_rec_appendix(metadata, written_by="test 0.0.0")
+    parsed = parse_rec_appendix(block.decode("ascii"))
+
+    assert parsed["_version"] == 1
+    assert parsed["written_by"] == "test 0.0.0"
+    assert parsed["coordinate_frame"] == "voxel_index"
+    assert parsed["source_shape"] == (194, 200, 199)
+    assert parsed["crop_offset"] == (0, 0, 0)
+    assert parsed["spacing"] == (1.0, 0.325, 0.325)
+    assert parsed["some_unknown_field"] == "kept-as-string"
+
+
+def test_write_rec_appendix_pins_wire_format() -> None:
+    """The wire format is pinned to an exact byte layout, independent of the installed
+    package version.
+    """
+    metadata = {"coordinate_frame": "physical", "spacing": (1.0, 0.5)}
+
+    block = write_rec_appendix(metadata, written_by="test 0.0.0")
+
+    expected = (
+        b"# rec-appendix 1\n"
+        b"# written_by = test 0.0.0\n"
+        b"# coordinate_frame = physical\n"
+        b"# spacing = 1.0 0.5\n"
+    )
+    assert block == expected
+
+
+def test_write_rec_appendix_drops_reserved_keys() -> None:
+    """`written_by`/`_version` in the metadata dict are ignored, not duplicated."""
+    metadata = {"_version": 999, "written_by": "someone-else", "spacing_unit": "um"}
+
+    block = write_rec_appendix(metadata, written_by="test 0.0.0")
+
+    assert block.count(b"written_by") == 1
+    assert b"_version" not in block
+    parsed = parse_rec_appendix(block.decode("ascii"))
+    assert parsed["_version"] == 1
+    assert parsed["written_by"] == "test 0.0.0"
+    assert parsed["spacing_unit"] == "um"
+
+
+def test_write_rec_appendix_rejects_non_ascii() -> None:
+    """A non-ASCII metadata value raises before any file is written."""
+    with pytest.raises(UnicodeEncodeError):
+        write_rec_appendix({"spacing_unit": "µm"}, written_by="test 0.0.0")
+
+
+def _mesh_3d() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    points, triangles, labels = iorec.load_rec("tests/assets/text.rec")
+    return points, triangles, labels
+
+
+def _mesh_2d() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    points, segments, labels = iorec.load_2d_rec("tests/assets/text_2d.rec")
+    return points, segments, labels
+
+
+@pytest.mark.parametrize("binary_mode", [False, True])
+def test_save_rec_metadata_round_trip_3d(tmp_path: Path, binary_mode: bool) -> None:
+    """save_rec(metadata=...) round trips through load_rec_appendix, in 3D."""
+    points, triangles, labels = _mesh_3d()
+    filename = tmp_path / "mesh.rec"
+    metadata = {"coordinate_frame": "voxel_index", "spacing": (1.0, 0.325, 0.325)}
+
+    iorec.save_rec(
+        filename,
+        points,
+        triangles,
+        labels,
+        binary_mode=binary_mode,
+        metadata=metadata,
+    )
+
+    saved_points, saved_triangles, saved_labels = iorec.load_rec(filename)
+    assert np.array_equal(points, saved_points)
+    assert np.array_equal(triangles, saved_triangles)
+    assert np.array_equal(labels, saved_labels)
+
+    appendix = iorec.load_rec_appendix(filename)
+    assert appendix is not None
+    assert appendix["coordinate_frame"] == "voxel_index"
+    assert appendix["spacing"] == (1.0, 0.325, 0.325)
+
+
+@pytest.mark.parametrize("binary_mode", [False, True])
+def test_save_2d_rec_metadata_round_trip(tmp_path: Path, binary_mode: bool) -> None:
+    """save_2d_rec(metadata=...) round trips through load_rec_appendix, in 2D."""
+    points, segments, labels = _mesh_2d()
+    filename = tmp_path / "mesh2d.rec"
+    metadata = {"coordinate_frame": "physical", "spacing": (0.5, 0.5)}
+
+    iorec.save_2d_rec(
+        filename,
+        points,
+        segments,
+        labels,
+        binary_mode=binary_mode,
+        metadata=metadata,
+    )
+
+    saved_points, saved_segments, saved_labels = iorec.load_2d_rec(filename)
+    assert np.array_equal(points, saved_points)
+    assert np.array_equal(segments, saved_segments)
+    assert np.array_equal(labels, saved_labels)
+
+    appendix = iorec.load_rec_appendix(filename)
+    assert appendix is not None
+    assert appendix["coordinate_frame"] == "physical"
+    assert appendix["spacing"] == (0.5, 0.5)
+
+
+def test_load_rec_appendix_none_when_absent() -> None:
+    """A file saved without metadata has no appendix."""
+    assert iorec.load_rec_appendix("tests/assets/text.rec") is None
+
+
+def test_load_rec_appendix_empty_dict_is_not_none(tmp_path: Path) -> None:
+    """An explicitly empty metadata dict is not the same as no metadata at all."""
+    points, triangles, labels = _mesh_3d()
+    filename = tmp_path / "mesh.rec"
+
+    iorec.save_rec(filename, points, triangles, labels, metadata={})
+
+    appendix = iorec.load_rec_appendix(filename)
+    assert appendix is not None
+    assert set(appendix.keys()) == {"_version", "written_by"}
+
+
+def test_save_rec_metadata_error_writes_no_file(tmp_path: Path) -> None:
+    """A bad (non-ASCII) metadata value raises before the file is written at all."""
+    points, triangles, labels = _mesh_3d()
+    filename = tmp_path / "mesh.rec"
+
+    with pytest.raises(UnicodeEncodeError):
+        iorec.save_rec(
+            filename,
+            points,
+            triangles,
+            labels,
+            metadata={"spacing_unit": "µm"},
+        )
+
+    assert not filename.exists()
+
+
+def test_metadata_round_trip_reuse(tmp_path: Path) -> None:
+    """Feeding a loaded appendix dict straight back into save_rec doesn't corrupt it."""
+    points, triangles, labels = _mesh_3d()
+    filename_a = tmp_path / "a.rec"
+    filename_b = tmp_path / "b.rec"
+
+    iorec.save_rec(
+        filename_a,
+        points,
+        triangles,
+        labels,
+        metadata={"coordinate_frame": "voxel_index"},
+    )
+    reused_metadata = iorec.load_rec_appendix(filename_a)
+    assert reused_metadata is not None
+
+    iorec.save_rec(filename_b, points, triangles, labels, metadata=reused_metadata)
+
+    appendix_b = iorec.load_rec_appendix(filename_b)
+    assert appendix_b is not None
+    assert appendix_b["coordinate_frame"] == "voxel_index"
+    with filename_b.open("rb") as f:
+        content = f.read()
+    assert content.count(b"written_by") == 1
+    assert b"_version =" not in content
+
+
+def test_load_rec_appendix_missing_file_raises() -> None:
+    """load_rec_appendix on a nonexistent file raises FileNotFoundError."""
+    with pytest.raises(FileNotFoundError) as exc_info:
+        iorec.load_rec_appendix("tests/assets/NOT_A_FILE.rec")
+
+    assert (
+        exc_info.value.args[0]
+        == f"{Path('tests/assets/NOT_A_FILE.rec').resolve()} not found."
+    )
