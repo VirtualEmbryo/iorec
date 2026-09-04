@@ -109,6 +109,10 @@ def parse_rec_appendix(block_text: str) -> dict[str, Any]:
     return metadata
 
 
+def _appendix_marker() -> bytes:
+    return f"# {_APPENDIX_MAGIC} ".encode("ascii")
+
+
 def load_rec_appendix(filename: str | Path) -> dict[str, Any] | None:
     """Read the trailing metadata appendix from a `.rec`/`.arec` file, if present.
 
@@ -135,8 +139,28 @@ def load_rec_appendix(filename: str | Path) -> dict[str, Any] | None:
         error = f"{filename} not found."
         raise FileNotFoundError(error)
     raw = filename.read_bytes()
-    marker = f"# {_APPENDIX_MAGIC} ".encode("ascii")
-    idx = raw.rfind(marker)
+    idx = raw.rfind(_appendix_marker())
     if idx == -1:
         return None
     return parse_rec_appendix(raw[idx:].decode("ascii"))
+
+
+def _split_rec_bytes(raw: bytes) -> tuple[bytes, dict[str, Any] | None]:
+    """Split raw `.rec`/`.arec` file bytes into geometry bytes and parsed metadata.
+
+    Lets a caller that already has the whole file in memory get both geometry and
+    metadata from that single buffer, instead of reading the file a second time (as
+    calling `load_rec_appendix` separately would) just to look for the appendix.
+
+    Args:
+        raw: the full raw bytes of a `.rec`/`.arec` file.
+
+    Returns:
+        tuple[bytes, dict[str, Any] | None]: the geometry bytes (everything before the
+        appendix, or the whole input if there is none) and the parsed metadata (`None`
+        if there is no appendix) -- see `load_rec_appendix`.
+    """
+    idx = raw.rfind(_appendix_marker())
+    if idx == -1:
+        return raw, None
+    return raw[:idx], parse_rec_appendix(raw[idx:].decode("ascii"))

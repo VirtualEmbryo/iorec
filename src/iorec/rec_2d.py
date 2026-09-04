@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import struct
 from pathlib import Path
 from typing import Any
@@ -9,7 +10,18 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from iorec.rec_appendix import _iorec_version, write_rec_appendix
+from iorec.rec_appendix import _iorec_version, _split_rec_bytes, write_rec_appendix
+
+
+def _resolve_2d_rec_path(filename: str | Path) -> Path:
+    filename = Path(filename).resolve()
+    if not filename.exists():
+        error = f"{filename} not found."
+        raise FileNotFoundError(error)
+    if filename.suffix not in (".rec", ".arec"):
+        error = f"{filename} is not a .rec or .arec file."
+        raise ValueError(error)
+    return filename
 
 
 def load_2d_rec(
@@ -30,15 +42,45 @@ def load_2d_rec(
         - segments: np.array of shape (num_segments, 2) (ulonglong)
         - labels: np.array of shape (num_segments, 2) (uint)
     """
-    filename = Path(filename).resolve()
-    if not filename.exists():
-        error = f"{filename} not found."
-        raise FileNotFoundError(error)
-    if filename.suffix == ".rec" or filename.suffix == ".arec":
-        return _load_2d_rec_file(filename)
+    filename = _resolve_2d_rec_path(filename)
+    return _load_2d_rec_file(filename)
+
+
+def load_2d_rec_with_metadata(
+    filename: str | Path,
+) -> tuple[
+    NDArray[np.float64],
+    NDArray[np.int64],
+    NDArray[np.int64],
+    dict[str, Any] | None,
+]:
+    """Read a 2D rec mesh file together with its metadata appendix, if any.
+
+    Reads the file once and splits geometry from metadata in memory -- unlike calling
+    `load_2d_rec` and `load_rec_appendix` separately, which would each read the whole
+    file on their own.
+
+    Args:
+        filename (str | Path): The path to the file on disk.
+
+    Raises:
+        ValueError: If the path given is not a .rec or .arec file.
+        FileNotFoundError: If the file doesn't exist.
+
+    Returns:
+        tuple[np.array, np.array, np.array, dict | None]: (points, segments, labels,
+        metadata), with points/segments/labels as in `load_2d_rec`, and metadata as in
+        `load_rec_appendix` (`None` if the file has no appendix).
+    """
+    filename = _resolve_2d_rec_path(filename)
+    geometry_bytes, metadata = _split_rec_bytes(filename.read_bytes())
+
+    if _is_binary_bytes(geometry_bytes):
+        points, segments, labels = _parse_2d_binary_rec_bytes(geometry_bytes)
     else:
-        error = f"{filename} is not a .rec or .arec file."
-        raise ValueError(error)
+        points, segments, labels = _parse_2d_text_rec_bytes(geometry_bytes)
+
+    return points, segments, labels, metadata
 
 
 def _load_2d_rec_file(
@@ -109,9 +151,84 @@ def _load_2d_text_rec_file(
     )
 
 
+def _is_binary_bytes(data: bytes, chunk_size: int = 64) -> bool:
+    return b"\x00" in data[:chunk_size]
+
+
 def _is_binary(file_name: Path, chunk_size: int = 64) -> bool:
     with Path.open(file_name, "rb") as f:
-        return b"\x00" in f.read(chunk_size)
+        return _is_binary_bytes(f.read(chunk_size), chunk_size)
+
+
+def _parse_2d_binary_rec_bytes(
+    data: bytes,
+) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
+    """Parse geometry from an in-memory buffer, e.g. the geometry half of a buffer
+    already split by `iorec.rec_appendix._split_rec_bytes`.
+
+    Kept separate from `_load_2d_binary_rec_file` (which streams from disk with
+    `np.fromfile`) rather than unifying the two: unifying would make plain
+    `load_2d_rec` hold the whole file in memory as `bytes` *and* as the parsed array at
+    once, which for very large files is a real peak-memory regression that
+    `load_2d_rec` shouldn't pay just so `load_2d_rec_with_metadata` can avoid a second
+    read.
+    """
+    (number_of_points,) = struct.unpack_from("Q", data)
+    offset = 8
+    points_count = 2 * number_of_points
+    points = (
+        np.frombuffer(data, dtype=np.float64, count=points_count, offset=offset)
+        .reshape((number_of_points, 2))
+        .copy()
+    )
+    offset += points_count * 8
+
+    (number_of_segments,) = struct.unpack_from("Q", data, offset)
+    offset += 8
+    dtype_segments_and_labels = np.dtype(
+        [("segments", np.int64, (2,)), ("labels", np.int32, (2,))],
+    )
+    segments_and_labels = np.frombuffer(
+        data,
+        dtype=dtype_segments_and_labels,
+        count=number_of_segments,
+        offset=offset,
+    )
+
+    return (
+        points,
+        segments_and_labels["segments"].astype(np.int64),
+        segments_and_labels["labels"].astype(np.int64),
+    )
+
+
+def _parse_2d_text_rec_bytes(
+    data: bytes,
+) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
+    """Parse geometry from an in-memory buffer. See `_parse_2d_binary_rec_bytes` for
+    why this is kept separate from `_load_2d_text_rec_file` rather than unifying the
+    two.
+    """
+    with io.StringIO(data.decode()) as f:
+        number_of_points = int(f.readline().strip())
+        points = (
+            np.loadtxt(f, max_rows=number_of_points, dtype=np.float64, ndmin=2)
+            if number_of_points > 0
+            else np.empty((0, 2), dtype=np.float64)
+        )
+
+        number_of_segments = int(f.readline().strip())
+        segments_and_labels = (
+            np.loadtxt(f, max_rows=number_of_segments, dtype=np.int64, ndmin=2)
+            if number_of_segments > 0
+            else np.empty((0, 4), dtype=np.int64)
+        )
+
+    return (
+        points,
+        segments_and_labels[:, 0:2],
+        segments_and_labels[:, 2:4],
+    )
 
 
 def save_2d_rec(

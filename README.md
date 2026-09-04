@@ -24,8 +24,10 @@ For 2D .rec meshes:
 - iorec.load_2d_rec()
 - iorec.save_2d_rec()
 
-Plus one for the optional metadata appendix (see below), shared by both 2D and 3D:
-- iorec.load_rec_appendix()
+Plus the optional metadata appendix (see below):
+- iorec.load_rec_appendix() — shared by both 2D and 3D
+- iorec.load_rec_with_metadata() — 3D, combines load_rec() and load_rec_appendix()
+- iorec.load_2d_rec_with_metadata() — 2D, combines load_2d_rec() and load_rec_appendix()
 
 ### load_rec
 
@@ -172,3 +174,14 @@ disk. The `written_by`/`_version` keys are reserved for the appendix's own bookk
 they are ignored if present in a `metadata` dict you pass in, so a dict returned by
 `load_rec_appendix` can be fed straight back into `save_rec`/`save_2d_rec` without
 duplicating or corrupting them.
+
+To read the mesh and its metadata in a single call, use `load_rec_with_metadata` (3D) or
+`load_2d_rec_with_metadata` (2D) instead of calling `load_rec`/`load_2d_rec` and
+`load_rec_appendix` separately:
+
+```python
+import iorec
+
+points, triangles, labels, metadata = iorec.load_rec_with_metadata("mesh.rec")
+# metadata is None if the file has no appendix
+```

@@ -109,10 +109,21 @@ def test_save_rec_metadata_round_trip_3d(tmp_path: Path, binary_mode: bool) -> N
 
 @pytest.mark.parametrize("binary_mode", [False, True])
 def test_save_2d_rec_metadata_round_trip(tmp_path: Path, binary_mode: bool) -> None:
-    """save_2d_rec(metadata=...) round trips through load_rec_appendix, in 2D."""
+    """save_2d_rec(metadata=...) round trips through load_rec_appendix, in 2D.
+
+    In particular, the sequence-valued fields (spacing, source_shape, crop_offset) are
+    parsed generically -- no hardcoded 3-tuple arity -- so 2-tuples round trip as
+    2-tuples, matching a 2D file's dimensionality, not the 3D shape shown in the
+    README example.
+    """
     points, segments, labels = _mesh_2d()
     filename = tmp_path / "mesh2d.rec"
-    metadata = {"coordinate_frame": "physical", "spacing": (0.5, 0.5)}
+    metadata = {
+        "coordinate_frame": "physical",
+        "spacing": (0.5, 0.5),
+        "source_shape": (200, 200),
+        "crop_offset": (0, 0),
+    }
 
     iorec.save_2d_rec(
         filename,
@@ -132,6 +143,11 @@ def test_save_2d_rec_metadata_round_trip(tmp_path: Path, binary_mode: bool) -> N
     assert appendix is not None
     assert appendix["coordinate_frame"] == "physical"
     assert appendix["spacing"] == (0.5, 0.5)
+    assert appendix["source_shape"] == (200, 200)
+    assert appendix["crop_offset"] == (0, 0)
+    assert all(isinstance(v, float) for v in appendix["spacing"])
+    assert all(isinstance(v, int) for v in appendix["source_shape"])
+    assert all(isinstance(v, int) for v in appendix["crop_offset"])
 
 
 def test_load_rec_appendix_none_when_absent() -> None:
@@ -193,6 +209,151 @@ def test_metadata_round_trip_reuse(tmp_path: Path) -> None:
         content = f.read()
     assert content.count(b"written_by") == 1
     assert b"_version =" not in content
+
+
+def test_load_rec_with_metadata(tmp_path: Path) -> None:
+    """load_rec_with_metadata combines load_rec and load_rec_appendix."""
+    points, triangles, labels = _mesh_3d()
+    filename = tmp_path / "mesh.rec"
+    metadata = {"coordinate_frame": "voxel_index", "spacing": (1.0, 0.325, 0.325)}
+
+    iorec.save_rec(filename, points, triangles, labels, metadata=metadata)
+
+    loaded_points, loaded_triangles, loaded_labels, loaded_metadata = (
+        iorec.load_rec_with_metadata(filename)
+    )
+    assert np.array_equal(points, loaded_points)
+    assert np.array_equal(triangles, loaded_triangles)
+    assert np.array_equal(labels, loaded_labels)
+    assert loaded_metadata is not None
+    assert loaded_metadata["coordinate_frame"] == "voxel_index"
+    assert loaded_metadata["spacing"] == (1.0, 0.325, 0.325)
+
+
+def test_load_rec_with_metadata_none_when_absent(tmp_path: Path) -> None:
+    """load_rec_with_metadata returns metadata=None for a file with no appendix."""
+    points, triangles, labels = _mesh_3d()
+    filename = tmp_path / "mesh.rec"
+
+    iorec.save_rec(filename, points, triangles, labels)
+
+    loaded_points, loaded_triangles, loaded_labels, loaded_metadata = (
+        iorec.load_rec_with_metadata(filename)
+    )
+    assert np.array_equal(points, loaded_points)
+    assert np.array_equal(triangles, loaded_triangles)
+    assert np.array_equal(labels, loaded_labels)
+    assert loaded_metadata is None
+
+
+def test_load_2d_rec_with_metadata(tmp_path: Path) -> None:
+    """load_2d_rec_with_metadata combines load_2d_rec and load_rec_appendix."""
+    points, segments, labels = _mesh_2d()
+    filename = tmp_path / "mesh2d.rec"
+    metadata = {"coordinate_frame": "physical", "spacing": (0.5, 0.5)}
+
+    iorec.save_2d_rec(filename, points, segments, labels, metadata=metadata)
+
+    loaded_points, loaded_segments, loaded_labels, loaded_metadata = (
+        iorec.load_2d_rec_with_metadata(filename)
+    )
+    assert np.array_equal(points, loaded_points)
+    assert np.array_equal(segments, loaded_segments)
+    assert np.array_equal(labels, loaded_labels)
+    assert loaded_metadata is not None
+    assert loaded_metadata["coordinate_frame"] == "physical"
+    assert loaded_metadata["spacing"] == (0.5, 0.5)
+
+
+def test_load_2d_rec_with_metadata_none_when_absent(tmp_path: Path) -> None:
+    """load_2d_rec_with_metadata returns metadata=None for a file with no appendix."""
+    points, segments, labels = _mesh_2d()
+    filename = tmp_path / "mesh2d.rec"
+
+    iorec.save_2d_rec(filename, points, segments, labels)
+
+    loaded_points, loaded_segments, loaded_labels, loaded_metadata = (
+        iorec.load_2d_rec_with_metadata(filename)
+    )
+    assert np.array_equal(points, loaded_points)
+    assert np.array_equal(segments, loaded_segments)
+    assert np.array_equal(labels, loaded_labels)
+    assert loaded_metadata is None
+
+
+@pytest.mark.parametrize("binary_mode", [False, True])
+def test_load_rec_with_metadata_reads_file_once(
+    tmp_path: Path,
+    binary_mode: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """load_rec_with_metadata reads the file exactly once, unlike calling load_rec and
+    load_rec_appendix separately (which would each read the whole file on their own).
+    """
+    points, triangles, labels = _mesh_3d()
+    filename = tmp_path / "mesh.rec"
+    iorec.save_rec(
+        filename,
+        points,
+        triangles,
+        labels,
+        binary_mode=binary_mode,
+        metadata={"coordinate_frame": "voxel_index"},
+    )
+
+    read_bytes_calls = 0
+    original_read_bytes = Path.read_bytes
+
+    def counting_read_bytes(self: Path) -> bytes:
+        nonlocal read_bytes_calls
+        read_bytes_calls += 1
+        return original_read_bytes(self)
+
+    monkeypatch.setattr(Path, "read_bytes", counting_read_bytes)
+
+    iorec.load_rec_with_metadata(filename)
+
+    # `read_bytes` itself opens the file once internally -- what matters is that the
+    # file's content is fetched from disk exactly once, not twice (once streamed for
+    # geometry, once via a separate `read_bytes()` for the appendix, as calling
+    # `load_rec`+`load_rec_appendix` would do).
+    assert read_bytes_calls == 1
+
+
+@pytest.mark.parametrize("binary_mode", [False, True])
+def test_load_2d_rec_with_metadata_reads_file_once(
+    tmp_path: Path,
+    binary_mode: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """load_2d_rec_with_metadata reads the file exactly once, unlike calling
+    load_2d_rec and load_rec_appendix separately.
+    """
+    points, segments, labels = _mesh_2d()
+    filename = tmp_path / "mesh2d.rec"
+    iorec.save_2d_rec(
+        filename,
+        points,
+        segments,
+        labels,
+        binary_mode=binary_mode,
+        metadata={"coordinate_frame": "physical"},
+    )
+
+    read_bytes_calls = 0
+    original_read_bytes = Path.read_bytes
+
+    def counting_read_bytes(self: Path) -> bytes:
+        nonlocal read_bytes_calls
+        read_bytes_calls += 1
+        return original_read_bytes(self)
+
+    monkeypatch.setattr(Path, "read_bytes", counting_read_bytes)
+
+    iorec.load_2d_rec_with_metadata(filename)
+
+    # See test_load_rec_with_metadata_reads_file_once for why only read_bytes matters.
+    assert read_bytes_calls == 1
 
 
 def test_load_rec_appendix_missing_file_raises() -> None:
