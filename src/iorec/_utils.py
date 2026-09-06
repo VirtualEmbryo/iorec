@@ -32,17 +32,28 @@ def _write_geometry_with_appendix(
     filename: str | Path,
     write_geometry: Callable[[], None],
     metadata: dict[str, Any] | None,
+    written_by: str | None = None,
 ) -> None:
     """Write geometry, then an optional trailing metadata appendix.
 
     `write_geometry` must write the full geometry file at `filename` (binary or text
     mode); the appendix, if any, is appended afterwards so it stays trailing.
+
+    `written_by` names the program that produced the mesh. When `None`, iorec's own
+    version is stamped instead, unchanged from before this parameter existed. When
+    given, iorec's own version is stamped on a separate `writer_library` line instead,
+    so both facts survive.
     """
-    appendix_bytes = (
-        write_rec_appendix(metadata, written_by=_iorec_version())
-        if metadata is not None
-        else None
-    )
+    appendix_bytes = None
+    if metadata is not None:
+        if written_by is None:
+            appendix_bytes = write_rec_appendix(metadata, written_by=_iorec_version())
+        else:
+            appendix_bytes = write_rec_appendix(
+                metadata,
+                written_by=written_by,
+                writer_library=f"iorec {_iorec_version()}",
+            )
 
     write_geometry()
 

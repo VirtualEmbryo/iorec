@@ -227,6 +227,7 @@ def save_rec(
     binary_mode: bool = False,
     *,
     metadata: dict[str, Any] | None = None,
+    written_by: str | None = None,
 ) -> None:
     """Save a rec mesh file at filename. Binary or text mode are available.
 
@@ -244,6 +245,13 @@ def save_rec(
             extra -- byte-for-byte the same file as before this option existed. When
             supplied, a trailing metadata appendix is appended after the geometry data;
             see `iorec.rec_appendix.write_rec_appendix`.
+        written_by (str | None, optional): a version string identifying the program
+            that produced the mesh, stamped on the appendix's `written_by` line.
+            Defaults to `None`, which stamps iorec's own version there instead --
+            unchanged from before this parameter existed. When supplied, iorec's own
+            version is stamped on a separate `writer_library` line instead, so both
+            facts survive: what produced the mesh, and what serialised it. Has no
+            effect if `metadata` is `None`, since no appendix is written in that case.
     """
 
     def write_geometry() -> None:
@@ -252,7 +260,7 @@ def save_rec(
         else:
             _save_rec_text(filename, points, triangles, labels)
 
-    _write_geometry_with_appendix(filename, write_geometry, metadata)
+    _write_geometry_with_appendix(filename, write_geometry, metadata, written_by)
 
 
 def _save_rec_binary(
