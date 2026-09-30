@@ -21,11 +21,11 @@ _APPENDIX_MAGIC = "rec-appendix"
 _APPENDIX_VERSION = 1
 _APPENDIX_SEQUENCE_INT_KEYS = frozenset({"source_shape", "crop_offset"})
 _APPENDIX_SEQUENCE_FLOAT_KEYS = frozenset({"spacing"})
-# Bookkeeping keys, always emitted by `write_rec_appendix` itself (the header line and
-# the `written_by` line): silently dropped if present in a caller's metadata dict, so
-# that feeding a dict from `load_rec_appendix` straight back into `save_rec` doesn't
-# duplicate or corrupt them.
-_APPENDIX_RESERVED_KEYS = frozenset({"written_by", "_version"})
+# Bookkeeping keys, always emitted by `write_rec_appendix` itself (the header line, the
+# `written_by` line, and the optional `writer_library` line): silently dropped if
+# present in a caller's metadata dict, so that feeding a dict from
+# `load_rec_appendix` straight back into `save_rec` doesn't duplicate or corrupt them.
+_APPENDIX_RESERVED_KEYS = frozenset({"written_by", "writer_library", "_version"})
 
 
 def _iorec_version() -> str:
@@ -42,7 +42,12 @@ def _format_appendix_value(value: object) -> str:
     return str(value)
 
 
-def write_rec_appendix(metadata: dict[str, Any], *, written_by: str) -> bytes:
+def write_rec_appendix(
+    metadata: dict[str, Any],
+    *,
+    written_by: str,
+    writer_library: str | None = None,
+) -> bytes:
     """Build the trailing `.rec`/`.arec` metadata appendix block.
 
     Args:
@@ -50,9 +55,14 @@ def write_rec_appendix(metadata: dict[str, Any], *, written_by: str) -> bytes:
             `spacing_unit`, `source_shape`, `crop_offset`. Sequence-valued fields
             (`spacing`, `source_shape`, `crop_offset`) are written space-separated.
             Values must be ASCII-only -- `load_rec_appendix` decodes the appendix as
-            ASCII. Any of the reserved keys `written_by`/`_version` are ignored, since
-            this function always writes its own header and `written_by` line.
+            ASCII. Any of the reserved keys `written_by`/`writer_library`/`_version`
+            are ignored, since this function always writes those itself.
         written_by: a version string stamped on the appendix by the writer.
+        writer_library: an optional `library version` string stamped on its own line
+            right after `written_by`, identifying the library that serialised the
+            file. Lets both facts survive when `written_by` names something else (the
+            program that produced the mesh): what produced it, and what wrote the
+            bytes. Omitted entirely when `None`.
 
     Raises:
         UnicodeEncodeError: if a metadata value contains a non-ASCII character.
@@ -62,6 +72,8 @@ def write_rec_appendix(metadata: dict[str, Any], *, written_by: str) -> bytes:
         appended after the geometry bytes/text already written.
     """
     lines = [f"# {_APPENDIX_MAGIC} {_APPENDIX_VERSION}", f"# written_by = {written_by}"]
+    if writer_library is not None:
+        lines.append(f"# writer_library = {writer_library}")
     for key, raw_value in metadata.items():
         if key in _APPENDIX_RESERVED_KEYS:
             continue
