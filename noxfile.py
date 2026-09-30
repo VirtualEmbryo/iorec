@@ -1,4 +1,5 @@
 """Nox tasks definition."""
+
 from __future__ import annotations
 
 import shutil
@@ -64,7 +65,7 @@ def check_manifest(session: nox.Session) -> None:
 DIR = Path(__file__).parent.resolve()
 
 
-@nox.session(python=["3.8", "3.9", "3.10", "3.11"])
+@nox.session(python=["3.13"])
 def build(session: nox.Session) -> None:
     """(build) Build an SDist and wheel, locally."""
     build_p = DIR.joinpath("build")
