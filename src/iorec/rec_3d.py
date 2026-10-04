@@ -11,6 +11,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from iorec._utils import (
+    _format_text_rec,
     _is_binary,
     _is_binary_bytes,
     _read_text_count,
@@ -379,18 +380,7 @@ def _save_rec_text(
     labels: NDArray[np.int64],
 ) -> None:
     """Save a rec file at filename. Text only."""
-    content = ""
-    content += str(len(points)) + "\n"
-
-    for i in range(len(points)):
-        # content += f"{points[i][0]:.5f} {points[i][1]:.5f} {points[i][2]:.5f}\n"
-        content += f"{points[i][0]} {points[i][1]} {points[i][2]}\n"
-
-    content += str(len(triangles)) + "\n"
-
-    for i in range(len(triangles)):
-        content += f"{triangles[i][0]} {triangles[i][1]} {triangles[i][2]} "
-        content += f"{labels[i][0]} {labels[i][1]}\n"
+    content = _format_text_rec(points, triangles, labels, 3)
 
     with Path(filename).open("w") as file:
         file.write(content)

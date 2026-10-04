@@ -109,3 +109,31 @@ def _read_text_rows(
     except ValueError as exc:
         error = f"{filename}: invalid {what} block: {exc}"
         raise RecFormatError(error) from exc
+
+
+def _format_text_rec(
+    points: NDArray[Any],
+    cells: NDArray[Any],
+    labels: NDArray[Any],
+    dimension: int,
+) -> str:
+    """Return the text of a .rec file: counts, one row per point and per cell.
+
+    Each value is written with `repr` (the shortest text that reads back to the same
+    float64, or the integer's digits), exactly as formatting each NumPy scalar in an
+    f-string did in earlier versions; `tolist()` turns the scalars into Python numbers
+    without changing their values. Each block is built with one `%` operation instead
+    of a Python loop over rows.
+    """
+    points = np.asarray(points)[:, :dimension]
+    records = np.empty((len(cells), dimension + 2), dtype=object)
+    records[:, :dimension] = np.asarray(cells)[:, :dimension]
+    records[:, dimension:] = np.asarray(labels)[:, :2]
+    point_row = " ".join(["%r"] * dimension) + "\n"
+    record_row = " ".join(["%r"] * (dimension + 2)) + "\n"
+    return (
+        f"{len(points)}\n"
+        + (point_row * len(points)) % tuple(points.reshape(-1).tolist())
+        + f"{len(records)}\n"
+        + (record_row * len(records)) % tuple(records.reshape(-1).tolist())
+    )

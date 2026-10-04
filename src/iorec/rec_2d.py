@@ -11,6 +11,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from iorec._utils import (
+    _format_text_rec,
     _is_binary,
     _is_binary_bytes,
     _read_text_count,
@@ -378,17 +379,7 @@ def _save_2d_rec_text(
     labels: NDArray[np.int64],
 ) -> None:
     """Save a 2D rec file at filename. Text only."""
-    content = ""
-    content += str(len(points)) + "\n"
-
-    for i in range(len(points)):
-        content += f"{points[i][0]} {points[i][1]}\n"
-
-    content += str(len(segments)) + "\n"
-
-    for i in range(len(segments)):
-        content += f"{segments[i][0]} {segments[i][1]} "
-        content += f"{labels[i][0]} {labels[i][1]}\n"
+    content = _format_text_rec(points, segments, labels, 2)
 
     with Path(filename).open("w") as file:
         file.write(content)
