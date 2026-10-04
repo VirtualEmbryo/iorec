@@ -112,9 +112,13 @@ def load_rec_with_metadata(
     return points, triangles, labels, metadata
 
 
+# On-disk layout of binary files: little-endian whatever the machine. Existing files
+# come from little-endian machines (x86-64, arm64), where this changes nothing; on a
+# big-endian machine, files stay readable and portable instead of byte-swapped.
 _DTYPE_TRIANGLES_AND_LABELS = np.dtype(
-    [("triangles", np.int64, (3,)), ("labels", np.int32, (2,))],
+    [("triangles", "<i8", (3,)), ("labels", "<i4", (2,))],
 )
+_DTYPE_POINTS = np.dtype("<f8")
 
 
 def _load_rec_file(
@@ -139,16 +143,18 @@ def _load_binary_rec_file(
         header = f.read(8)
         if validate:
             _check_binary_room(filename, len(header), 8, "point count")
-        (number_of_points,) = struct.unpack("Q", header)
+        (number_of_points,) = struct.unpack("<Q", header)
         if validate:
             _check_binary_room(filename, size - 8, 24 * number_of_points + 8, "points")
         # Then we read the vertices : they are in a 3D space
-        points = np.fromfile(f, count=3 * number_of_points, dtype=np.float64).reshape(
-            (number_of_points, 3),
+        points = (
+            np.fromfile(f, count=3 * number_of_points, dtype=_DTYPE_POINTS)
+            .reshape((number_of_points, 3))
+            .astype(np.float64, copy=False)
         )
 
         # Number of triangles
-        (number_of_triangles,) = struct.unpack("Q", f.read(8))
+        (number_of_triangles,) = struct.unpack("<Q", f.read(8))
         geometry_size = _binary_geometry_size(
             number_of_points,
             number_of_triangles,
@@ -250,19 +256,19 @@ def _parse_binary_rec_bytes(
     """
     if validate:
         _check_binary_room(filename, len(data), 8, "point count")
-    (number_of_points,) = struct.unpack_from("Q", data)
+    (number_of_points,) = struct.unpack_from("<Q", data)
     offset = 8
     points_count = 3 * number_of_points
     if validate:
         _check_binary_room(filename, len(data) - 8, 8 * points_count + 8, "points")
     points = (
-        np.frombuffer(data, dtype=np.float64, count=points_count, offset=offset)
+        np.frombuffer(data, dtype=_DTYPE_POINTS, count=points_count, offset=offset)
         .reshape((number_of_points, 3))
-        .copy()
+        .astype(np.float64)  # a native-endian copy, not a view on `data`
     )
     offset += points_count * 8
 
-    (number_of_triangles,) = struct.unpack_from("Q", data, offset)
+    (number_of_triangles,) = struct.unpack_from("<Q", data, offset)
     offset += 8
     if validate:
         geometry_size = _binary_geometry_size(
@@ -354,24 +360,14 @@ def _save_rec_binary(
     labels: NDArray[np.int64],
 ) -> None:
     """Save a rec file at filename. Binary only."""
-    bytes_content = struct.pack("Q", len(points))
-    bytes_content += points.flatten().tobytes()
-    bytes_content += struct.pack("Q", len(triangles))
-    dt = np.dtype([("triangles", np.int64, (3,)), ("labels", np.int32, (2,))])
+    records = np.empty(len(triangles), dtype=_DTYPE_TRIANGLES_AND_LABELS)
+    records["triangles"] = triangles
+    records["labels"] = labels
 
-    def map_tri_labels_func(
-        i: int,
-    ) -> tuple[Any, Any]:
-        # -> tuple[np.int64, np.int64, np.int64, np.int64, np.int64]:
-        return triangles[i], labels[i]
-
-    triangles_and_labels = np.fromiter(
-        (map_tri_labels_func(xi) for xi in range(len(triangles))),
-        dtype=dt,
-        count=len(triangles),
-    )
-
-    bytes_content += triangles_and_labels.tobytes()
+    bytes_content = struct.pack("<Q", len(points))
+    bytes_content += np.ascontiguousarray(points, dtype=_DTYPE_POINTS).tobytes()
+    bytes_content += struct.pack("<Q", len(triangles))
+    bytes_content += records.tobytes()
     with Path(filename).open("wb") as file:
         file.write(bytes_content)
 
