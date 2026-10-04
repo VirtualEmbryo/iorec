@@ -55,8 +55,8 @@ def load_rec(
     Returns:
         tuple[np.array, np.array, np.array]: (points, triangles, labels), with:
         - points: np.array of shape (num_points, 3) (float64)
-        - triangles: np.array of shape (num_triangles, 3) (ulonglong)
-        - labels: np.array of shape (num_triangles, 2) (uint)
+        - triangles: np.array of shape (num_triangles, 3) (int64)
+        - labels: np.array of shape (num_triangles, 2) (int64)
     """
     filename = _resolve_rec_path(filename)
     return _load_rec_file(filename, validate=validate)
@@ -323,6 +323,11 @@ def save_rec(
     """Save a rec mesh file at filename. Binary or text mode are available.
 
     Binary mode is more compact but might not be universally understood.
+
+    Both modes store every value exactly. Binary mode writes float64 coordinates,
+    int64 indices and int32 labels, little-endian on every machine, converting arrays
+    of other dtypes. Text mode writes each value with `repr`, the shortest text that
+    reads back to the same float64.
 
     Args:
         filename (str | Path): where to save the mesh file.

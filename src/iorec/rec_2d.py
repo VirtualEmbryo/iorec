@@ -52,8 +52,8 @@ def load_2d_rec(
     Returns:
         tuple[np.array, np.array, np.array]: (points, segments, labels), with:
         - points: np.array of shape (num_points, 2) (float64)
-        - segments: np.array of shape (num_segments, 2) (ulonglong)
-        - labels: np.array of shape (num_segments, 2) (uint)
+        - segments: np.array of shape (num_segments, 2) (int64)
+        - labels: np.array of shape (num_segments, 2) (int64)
     """
     filename = _resolve_rec_path(filename)
     return _load_2d_rec_file(filename, validate=validate)
@@ -322,6 +322,11 @@ def save_2d_rec(
     """Save a 2D rec mesh file at filename. Binary or text mode are available.
 
     Binary mode is more compact but might not be universally understood.
+
+    Both modes store every value exactly. Binary mode writes float64 coordinates,
+    int64 indices and int32 labels, little-endian on every machine, converting arrays
+    of other dtypes. Text mode writes each value with `repr`, the shortest text that
+    reads back to the same float64.
 
     Args:
         filename (str | Path): where to save the mesh file.
