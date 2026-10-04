@@ -223,3 +223,15 @@ import iorec
 points, triangles, labels, metadata = iorec.load_rec_with_metadata("mesh.rec")
 # metadata is None if the file has no appendix
 ```
+
+## License
+
+Copyright (C) 2023-2026 Matthieu Perez and the iorec contributors.
+
+iorec is free software: you can redistribute it and/or modify it under the terms of the
+GNU General Public License as published by the Free Software Foundation, either version
+3 of the License, or (at your option) any later version (SPDX: `GPL-3.0-or-later`).
+
+iorec is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+PURPOSE. See the GNU General Public License in [LICENSE](LICENSE) for more details.

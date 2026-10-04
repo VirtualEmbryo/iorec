@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]  # PEP 639 license expression
 build-backend = "hatchling.build"
 
 
@@ -11,18 +11,20 @@ authors = [{ name = "Matthieu Perez", email = "matthieu.perez@cnrs.fr" }]
 maintainers = [{ name = "Matthieu Perez", email = "matthieu.perez@cnrs.fr" }]
 description = "Load and save .rec mesh files"
 readme = "README.md"                                                                       # The long description is in this file
+license = "GPL-3.0-or-later"                                                               # SPDX expression (PEP 639)
+license-files = ["LICENSE"]
 requires-python = ">=3.8"                                                                  # best if only minimal version is specified
 
 # list of valid classifiers: https://pypi.org/classifiers/
 #  At least put:
 #  - which version(s) of Python your package works on,
 #  - which operating systems your package will work on.
-#  - which license your package is available under,
+#  - (the license is declared by `license` above: PEP 639 forbids license classifiers
+#    next to a license expression)
 classifiers = [
   "Development Status :: 4 - Beta",
   "Intended Audience :: Science/Research",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
