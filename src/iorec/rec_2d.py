@@ -5,7 +5,7 @@ from __future__ import annotations
 import io
 import struct
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 import numpy as np
 from numpy.typing import NDArray
@@ -13,23 +13,40 @@ from numpy.typing import NDArray
 from iorec._utils import (
     _is_binary,
     _is_binary_bytes,
+    _read_text_count,
+    _read_text_rows,
     _resolve_rec_path,
     _write_geometry_with_appendix,
 )
-from iorec.rec_appendix import _split_rec_bytes
+from iorec._validation import (
+    RecFormatError,
+    _binary_geometry_size,
+    _check_binary_room,
+    _check_binary_tail,
+    _check_mesh,
+    _check_text_tail,
+)
+from iorec.rec_appendix import _appendix_marker, _split_rec_bytes
 
 
 def load_2d_rec(
     filename: str | Path,
+    *,
+    validate: bool = False,
 ) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
     """Read a 2D rec mesh file.
 
     Args:
         filename (str | Path): The path to the file on disk.
+        validate (bool, optional): Check the file's structure and content, as
+            `load_rec` does with `validate=True`, for segments instead of triangles.
+            Defaults to False.
 
     Raises:
         ValueError: If the path given is not a .rec or .arec file.
         FileNotFoundError: If the file doesn't exist.
+        RecFormatError: With `validate=True`, if the file is malformed (a
+            `ValueError` subclass).
 
     Returns:
         tuple[np.array, np.array, np.array]: (points, segments, labels), with:
@@ -38,11 +55,13 @@ def load_2d_rec(
         - labels: np.array of shape (num_segments, 2) (uint)
     """
     filename = _resolve_rec_path(filename)
-    return _load_2d_rec_file(filename)
+    return _load_2d_rec_file(filename, validate=validate)
 
 
 def load_2d_rec_with_metadata(
     filename: str | Path,
+    *,
+    validate: bool = False,
 ) -> tuple[
     NDArray[np.float64],
     NDArray[np.int64],
@@ -57,10 +76,14 @@ def load_2d_rec_with_metadata(
 
     Args:
         filename (str | Path): The path to the file on disk.
+        validate (bool, optional): Check the geometry as `load_2d_rec` does with
+            `validate=True`. Defaults to False.
 
     Raises:
         ValueError: If the path given is not a .rec or .arec file.
         FileNotFoundError: If the file doesn't exist.
+        RecFormatError: With `validate=True`, if the file is malformed (a
+            `ValueError` subclass).
 
     Returns:
         tuple[np.array, np.array, np.array, dict | None]: (points, segments, labels,
@@ -71,28 +94,51 @@ def load_2d_rec_with_metadata(
     geometry_bytes, metadata = _split_rec_bytes(filename.read_bytes())
 
     if _is_binary_bytes(geometry_bytes):
-        points, segments, labels = _parse_2d_binary_rec_bytes(geometry_bytes)
+        points, segments, labels = _parse_2d_binary_rec_bytes(
+            geometry_bytes,
+            validate=validate,
+            filename=filename,
+        )
     else:
-        points, segments, labels = _parse_2d_text_rec_bytes(geometry_bytes)
+        points, segments, labels = _parse_2d_text_rec_bytes(
+            geometry_bytes,
+            validate=validate,
+            filename=filename,
+        )
 
     return points, segments, labels, metadata
 
 
+_DTYPE_SEGMENTS_AND_LABELS = np.dtype(
+    [("segments", np.int64, (2,)), ("labels", np.int32, (2,))],
+)
+
+
 def _load_2d_rec_file(
     filename: Path,
+    *,
+    validate: bool = False,
 ) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
     if _is_binary(filename):
-        return _load_2d_binary_rec_file(filename)
+        return _load_2d_binary_rec_file(filename, validate=validate)
     else:
-        return _load_2d_text_rec_file(filename)
+        return _load_2d_text_rec_file(filename, validate=validate)
 
 
 def _load_2d_binary_rec_file(
     filename: Path,
+    *,
+    validate: bool = False,
 ) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
+    size = filename.stat().st_size if validate else 0
     with Path.open(filename, "rb") as f:
         # First we read the number of vertices
-        (number_of_points,) = struct.unpack("Q", f.read(8))
+        header = f.read(8)
+        if validate:
+            _check_binary_room(filename, len(header), 8, "point count")
+        (number_of_points,) = struct.unpack("Q", header)
+        if validate:
+            _check_binary_room(filename, size - 8, 16 * number_of_points + 8, "points")
         # Then we read the vertices : they are in a 2D space
         points = np.fromfile(f, count=2 * number_of_points, dtype=np.float64).reshape(
             (number_of_points, 2),
@@ -100,54 +146,93 @@ def _load_2d_binary_rec_file(
 
         # Number of segments
         (number_of_segments,) = struct.unpack("Q", f.read(8))
-        # Each line defines a segment and 2 regions labels
-        dtype_segmens_and_labels = np.dtype(
-            [("segments", np.int64, (2,)), ("labels", np.int32, (2,))],
+        geometry_size = _binary_geometry_size(
+            number_of_points,
+            number_of_segments,
+            2,
+            _DTYPE_SEGMENTS_AND_LABELS.itemsize,
         )
+        if validate:
+            _check_binary_room(filename, size, geometry_size, "segments")
+        # Each line defines a segment and 2 regions labels
         segments_and_labels = np.fromfile(
             f,
             count=number_of_segments,
-            dtype=dtype_segmens_and_labels,
+            dtype=_DTYPE_SEGMENTS_AND_LABELS,
         )
+        if validate:
+            _check_binary_tail(filename, f.read(len(_appendix_marker())))
 
-    return (
-        points,
-        segments_and_labels["segments"].astype(np.int64),
-        segments_and_labels["labels"].astype(np.int64),
-    )
+    segments = segments_and_labels["segments"].astype(np.int64)
+    labels = segments_and_labels["labels"].astype(np.int64)
+    if validate:
+        counts = (number_of_points, number_of_segments)
+        _check_mesh(filename, points, segments, labels, 2, counts)
+    return points, segments, labels
 
 
 def _load_2d_text_rec_file(
     filename: Path,
+    *,
+    validate: bool = False,
 ) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
     with Path.open(filename) as f:
-        # First we read the number of vertices
-        number_of_points = int(f.readline().strip())
-        # Then we read the vertices : they are in a 2D space
-        points = (
-            np.loadtxt(f, max_rows=number_of_points, dtype=np.float64, ndmin=2)
-            if number_of_points > 0
-            else np.empty((0, 2), dtype=np.float64)
-        )
+        return _read_2d_text_rec(f, filename, validate=validate)
 
-        # Number of segments
-        number_of_segments = int(f.readline().strip())
-        # Each line defines a segment and 2 regions labels
-        segments_and_labels = (
-            np.loadtxt(f, max_rows=number_of_segments, dtype=np.int64, ndmin=2)
-            if number_of_segments > 0
-            else np.empty((0, 4), dtype=np.int64)
-        )
 
-    return (
-        points,
-        segments_and_labels[:, 0:2],
-        segments_and_labels[:, 2:4],
+def _read_2d_text_rec(
+    f: TextIO,
+    filename: Path | str,
+    *,
+    validate: bool,
+) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
+    """Read 2D text-mode geometry from an open stream (a file or a buffer)."""
+    # First we read the number of vertices
+    number_of_points = _read_text_count(f, filename, "point", validate=validate)
+    # Then we read the vertices : they are in a 2D space
+    points = _read_text_rows(
+        f,
+        number_of_points,
+        np.float64,
+        2,
+        filename,
+        "point",
+        validate=validate,
     )
+
+    # Number of segments
+    number_of_segments = _read_text_count(f, filename, "segment", validate=validate)
+    # Each line defines a segment and 2 regions labels
+    segments_and_labels = _read_text_rows(
+        f,
+        number_of_segments,
+        np.int64,
+        4,
+        filename,
+        "segment",
+        validate=validate,
+    )
+    segments = segments_and_labels[:, 0:2]
+    labels = segments_and_labels[:, 2:4]
+
+    if validate:
+        if segments_and_labels.shape[1:] != (4,):
+            error = (
+                f"{filename}: segment records have {segments_and_labels.shape[1]} "
+                "columns, expected 4 (two vertex indices and two labels)."
+            )
+            raise RecFormatError(error)
+        _check_text_tail(filename, f.read())
+        counts = (number_of_points, number_of_segments)
+        _check_mesh(filename, points, segments, labels, 2, counts)
+    return points, segments, labels
 
 
 def _parse_2d_binary_rec_bytes(
     data: bytes,
+    *,
+    validate: bool = False,
+    filename: Path | str = "<buffer>",
 ) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
     """Parse geometry from an in-memory buffer.
 
@@ -161,9 +246,13 @@ def _parse_2d_binary_rec_bytes(
     `load_2d_rec` shouldn't pay just so `load_2d_rec_with_metadata` can avoid a second
     read.
     """
+    if validate:
+        _check_binary_room(filename, len(data), 8, "point count")
     (number_of_points,) = struct.unpack_from("Q", data)
     offset = 8
     points_count = 2 * number_of_points
+    if validate:
+        _check_binary_room(filename, len(data) - 8, 8 * points_count + 8, "points")
     points = (
         np.frombuffer(data, dtype=np.float64, count=points_count, offset=offset)
         .reshape((number_of_points, 2))
@@ -173,51 +262,44 @@ def _parse_2d_binary_rec_bytes(
 
     (number_of_segments,) = struct.unpack_from("Q", data, offset)
     offset += 8
-    dtype_segments_and_labels = np.dtype(
-        [("segments", np.int64, (2,)), ("labels", np.int32, (2,))],
-    )
+    if validate:
+        geometry_size = _binary_geometry_size(
+            number_of_points,
+            number_of_segments,
+            2,
+            _DTYPE_SEGMENTS_AND_LABELS.itemsize,
+        )
+        _check_binary_room(filename, len(data), geometry_size, "segments")
+        _check_binary_tail(filename, data[geometry_size:])
     segments_and_labels = np.frombuffer(
         data,
-        dtype=dtype_segments_and_labels,
+        dtype=_DTYPE_SEGMENTS_AND_LABELS,
         count=number_of_segments,
         offset=offset,
     )
 
-    return (
-        points,
-        segments_and_labels["segments"].astype(np.int64),
-        segments_and_labels["labels"].astype(np.int64),
-    )
+    segments = segments_and_labels["segments"].astype(np.int64)
+    labels = segments_and_labels["labels"].astype(np.int64)
+    if validate:
+        counts = (number_of_points, number_of_segments)
+        _check_mesh(filename, points, segments, labels, 2, counts)
+    return points, segments, labels
 
 
 def _parse_2d_text_rec_bytes(
     data: bytes,
+    *,
+    validate: bool = False,
+    filename: Path | str = "<buffer>",
 ) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
     """Parse geometry from an in-memory buffer.
 
-    See `_parse_2d_binary_rec_bytes` for why this is kept separate from
-    `_load_2d_text_rec_file` rather than unifying the two.
+    Shares `_read_2d_text_rec` with `_load_2d_text_rec_file`: text parsing reads line
+    by line from a stream in both cases, so there is no peak-memory reason to keep two
+    copies.
     """
     with io.StringIO(data.decode()) as f:
-        number_of_points = int(f.readline().strip())
-        points = (
-            np.loadtxt(f, max_rows=number_of_points, dtype=np.float64, ndmin=2)
-            if number_of_points > 0
-            else np.empty((0, 2), dtype=np.float64)
-        )
-
-        number_of_segments = int(f.readline().strip())
-        segments_and_labels = (
-            np.loadtxt(f, max_rows=number_of_segments, dtype=np.int64, ndmin=2)
-            if number_of_segments > 0
-            else np.empty((0, 4), dtype=np.int64)
-        )
-
-    return (
-        points,
-        segments_and_labels[:, 0:2],
-        segments_and_labels[:, 2:4],
-    )
+        return _read_2d_text_rec(f, filename, validate=validate)
 
 
 def save_2d_rec(

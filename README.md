@@ -58,6 +58,30 @@ iorec.load_rec("tests/assets/README.md")  # raises ValueError
 # Be sure have the rights to access the file too, etc...
 ```
 
+### Validation on read
+
+Every reader takes an optional `validate=True` keyword. Without it (the default), files
+are read exactly as before, without checks: a truncated file or a 2D file read with
+`load_rec` can come back as wrong arrays. With it, the reader checks the file and raises
+`iorec.RecFormatError` (a `ValueError` subclass) naming the file and the first bad
+record:
+
+- binary files: size consistent with the declared counts (a trailing metadata appendix
+  is allowed, anything else after the geometry is not);
+- text files: valid counts, the declared number of rows, the expected number of columns,
+  nothing after the last record except an appendix;
+- all files: finite coordinates, vertex indices in `[0, num_points)`, non-negative labels,
+  and two different labels on each triangle (segment in 2D).
+
+```python
+import iorec
+
+try:
+    points, triangles, labels = iorec.load_rec("file.rec", validate=True)
+except iorec.RecFormatError as error:
+    print(error)
+```
+
 ### save_rec
 
 Save three numpy arrays of points, triangles and multi-material labels as a .rec mesh file.

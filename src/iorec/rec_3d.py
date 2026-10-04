@@ -5,7 +5,7 @@ from __future__ import annotations
 import io
 import struct
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 import numpy as np
 from numpy.typing import NDArray
@@ -13,23 +13,43 @@ from numpy.typing import NDArray
 from iorec._utils import (
     _is_binary,
     _is_binary_bytes,
+    _read_text_count,
+    _read_text_rows,
     _resolve_rec_path,
     _write_geometry_with_appendix,
 )
-from iorec.rec_appendix import _split_rec_bytes
+from iorec._validation import (
+    RecFormatError,
+    _binary_geometry_size,
+    _check_binary_room,
+    _check_binary_tail,
+    _check_mesh,
+    _check_text_tail,
+)
+from iorec.rec_appendix import _appendix_marker, _split_rec_bytes
 
 
 def load_rec(
     filename: str | Path,
+    *,
+    validate: bool = False,
 ) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
     """Read a rec mesh file.
 
     Args:
         filename (str | Path): The path to the file on disk.
+        validate (bool, optional): Check the file's structure and content: binary
+            size consistent with the declared counts (a trailing metadata appendix
+            is allowed), the expected number of rows and columns in text files,
+            finite coordinates, vertex indices in range, non-negative labels and two
+            different labels on each triangle. Defaults to False, which reads the
+            file as earlier versions did, without these checks.
 
     Raises:
         ValueError: If the path given is not a .rec or .arec file.
         FileNotFoundError: If the file doesn't exist.
+        RecFormatError: With `validate=True`, if the file is malformed (a
+            `ValueError` subclass).
 
     Returns:
         tuple[np.array, np.array, np.array]: (points, triangles, labels), with:
@@ -38,11 +58,13 @@ def load_rec(
         - labels: np.array of shape (num_triangles, 2) (uint)
     """
     filename = _resolve_rec_path(filename)
-    return _load_rec_file(filename)
+    return _load_rec_file(filename, validate=validate)
 
 
 def load_rec_with_metadata(
     filename: str | Path,
+    *,
+    validate: bool = False,
 ) -> tuple[
     NDArray[np.float64],
     NDArray[np.int64],
@@ -57,10 +79,14 @@ def load_rec_with_metadata(
 
     Args:
         filename (str | Path): The path to the file on disk.
+        validate (bool, optional): Check the geometry as `load_rec` does with
+            `validate=True`. Defaults to False.
 
     Raises:
         ValueError: If the path given is not a .rec or .arec file.
         FileNotFoundError: If the file doesn't exist.
+        RecFormatError: With `validate=True`, if the file is malformed (a
+            `ValueError` subclass).
 
     Returns:
         tuple[np.array, np.array, np.array, dict | None]: (points, triangles, labels,
@@ -71,28 +97,51 @@ def load_rec_with_metadata(
     geometry_bytes, metadata = _split_rec_bytes(filename.read_bytes())
 
     if _is_binary_bytes(geometry_bytes):
-        points, triangles, labels = _parse_binary_rec_bytes(geometry_bytes)
+        points, triangles, labels = _parse_binary_rec_bytes(
+            geometry_bytes,
+            validate=validate,
+            filename=filename,
+        )
     else:
-        points, triangles, labels = _parse_text_rec_bytes(geometry_bytes)
+        points, triangles, labels = _parse_text_rec_bytes(
+            geometry_bytes,
+            validate=validate,
+            filename=filename,
+        )
 
     return points, triangles, labels, metadata
 
 
+_DTYPE_TRIANGLES_AND_LABELS = np.dtype(
+    [("triangles", np.int64, (3,)), ("labels", np.int32, (2,))],
+)
+
+
 def _load_rec_file(
     filename: Path,
+    *,
+    validate: bool = False,
 ) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
     if _is_binary(filename):
-        return _load_binary_rec_file(filename)
+        return _load_binary_rec_file(filename, validate=validate)
     else:
-        return _load_text_rec_file(filename)
+        return _load_text_rec_file(filename, validate=validate)
 
 
 def _load_binary_rec_file(
     filename: Path,
+    *,
+    validate: bool = False,
 ) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
+    size = filename.stat().st_size if validate else 0
     with Path.open(filename, "rb") as f:
         # First we read the number of vertices
-        (number_of_points,) = struct.unpack("Q", f.read(8))
+        header = f.read(8)
+        if validate:
+            _check_binary_room(filename, len(header), 8, "point count")
+        (number_of_points,) = struct.unpack("Q", header)
+        if validate:
+            _check_binary_room(filename, size - 8, 24 * number_of_points + 8, "points")
         # Then we read the vertices : they are in a 3D space
         points = np.fromfile(f, count=3 * number_of_points, dtype=np.float64).reshape(
             (number_of_points, 3),
@@ -100,54 +149,93 @@ def _load_binary_rec_file(
 
         # Number of triangles
         (number_of_triangles,) = struct.unpack("Q", f.read(8))
-        # Each line defines a triangle and 2 regions labels
-        dtype_triangles_and_labels = np.dtype(
-            [("triangles", np.int64, (3,)), ("labels", np.int32, (2,))],
+        geometry_size = _binary_geometry_size(
+            number_of_points,
+            number_of_triangles,
+            3,
+            _DTYPE_TRIANGLES_AND_LABELS.itemsize,
         )
+        if validate:
+            _check_binary_room(filename, size, geometry_size, "triangles")
+        # Each line defines a triangle and 2 regions labels
         triangles_and_labels = np.fromfile(
             f,
             count=number_of_triangles,
-            dtype=dtype_triangles_and_labels,
+            dtype=_DTYPE_TRIANGLES_AND_LABELS,
         )
+        if validate:
+            _check_binary_tail(filename, f.read(len(_appendix_marker())))
 
-    return (
-        points,
-        triangles_and_labels["triangles"].astype(np.int64),
-        triangles_and_labels["labels"].astype(np.int64),
-    )
+    triangles = triangles_and_labels["triangles"].astype(np.int64)
+    labels = triangles_and_labels["labels"].astype(np.int64)
+    if validate:
+        counts = (number_of_points, number_of_triangles)
+        _check_mesh(filename, points, triangles, labels, 3, counts)
+    return points, triangles, labels
 
 
 def _load_text_rec_file(
     filename: Path,
+    *,
+    validate: bool = False,
 ) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
     with Path.open(filename) as f:
-        # First we read the number of vertices
-        number_of_points = int(f.readline().strip())
-        # Then we read the vertices : they are in a 3D space
-        points = (
-            np.loadtxt(f, max_rows=number_of_points, dtype=np.float64, ndmin=2)
-            if number_of_points > 0
-            else np.empty((0, 3), dtype=np.float64)
-        )
+        return _read_text_rec(f, filename, validate=validate)
 
-        # Number of triangles
-        number_of_triangles = int(f.readline().strip())
-        # Each line defines a triangle and 2 regions labels
-        triangles_and_labels = (
-            np.loadtxt(f, max_rows=number_of_triangles, dtype=np.int64, ndmin=2)
-            if number_of_triangles > 0
-            else np.empty((0, 5), dtype=np.int64)
-        )
 
-    return (
-        points,
-        triangles_and_labels[:, 0:3],
-        triangles_and_labels[:, 3:5],
+def _read_text_rec(
+    f: TextIO,
+    filename: Path | str,
+    *,
+    validate: bool,
+) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
+    """Read text-mode geometry from an open stream (a file or an in-memory buffer)."""
+    # First we read the number of vertices
+    number_of_points = _read_text_count(f, filename, "point", validate=validate)
+    # Then we read the vertices : they are in a 3D space
+    points = _read_text_rows(
+        f,
+        number_of_points,
+        np.float64,
+        3,
+        filename,
+        "point",
+        validate=validate,
     )
+
+    # Number of triangles
+    number_of_triangles = _read_text_count(f, filename, "triangle", validate=validate)
+    # Each line defines a triangle and 2 regions labels
+    triangles_and_labels = _read_text_rows(
+        f,
+        number_of_triangles,
+        np.int64,
+        5,
+        filename,
+        "triangle",
+        validate=validate,
+    )
+    triangles = triangles_and_labels[:, 0:3]
+    labels = triangles_and_labels[:, 3:5]
+
+    if validate:
+        if triangles_and_labels.shape[1:] != (5,):
+            error = (
+                f"{filename}: triangle records have {triangles_and_labels.shape[1]} "
+                "columns, expected 5 (three vertex indices and two labels)."
+            )
+            raise RecFormatError(error)
+        _check_text_tail(filename, f.read())
+        counts = (number_of_points, number_of_triangles)
+        _check_mesh(filename, points, triangles, labels, 3, counts)
+    return points, triangles, labels
 
 
 def _parse_binary_rec_bytes(
     data: bytes,
+    *,
+    validate: bool = False,
+    filename: Path | str = "<buffer>",
 ) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
     """Parse geometry from an in-memory buffer.
 
@@ -160,9 +248,13 @@ def _parse_binary_rec_bytes(
     for very large files is a real peak-memory regression that `load_rec` shouldn't
     pay just so `load_rec_with_metadata` can avoid a second read.
     """
+    if validate:
+        _check_binary_room(filename, len(data), 8, "point count")
     (number_of_points,) = struct.unpack_from("Q", data)
     offset = 8
     points_count = 3 * number_of_points
+    if validate:
+        _check_binary_room(filename, len(data) - 8, 8 * points_count + 8, "points")
     points = (
         np.frombuffer(data, dtype=np.float64, count=points_count, offset=offset)
         .reshape((number_of_points, 3))
@@ -172,51 +264,43 @@ def _parse_binary_rec_bytes(
 
     (number_of_triangles,) = struct.unpack_from("Q", data, offset)
     offset += 8
-    dtype_triangles_and_labels = np.dtype(
-        [("triangles", np.int64, (3,)), ("labels", np.int32, (2,))],
-    )
+    if validate:
+        geometry_size = _binary_geometry_size(
+            number_of_points,
+            number_of_triangles,
+            3,
+            _DTYPE_TRIANGLES_AND_LABELS.itemsize,
+        )
+        _check_binary_room(filename, len(data), geometry_size, "triangles")
+        _check_binary_tail(filename, data[geometry_size:])
     triangles_and_labels = np.frombuffer(
         data,
-        dtype=dtype_triangles_and_labels,
+        dtype=_DTYPE_TRIANGLES_AND_LABELS,
         count=number_of_triangles,
         offset=offset,
     )
 
-    return (
-        points,
-        triangles_and_labels["triangles"].astype(np.int64),
-        triangles_and_labels["labels"].astype(np.int64),
-    )
+    triangles = triangles_and_labels["triangles"].astype(np.int64)
+    labels = triangles_and_labels["labels"].astype(np.int64)
+    if validate:
+        counts = (number_of_points, number_of_triangles)
+        _check_mesh(filename, points, triangles, labels, 3, counts)
+    return points, triangles, labels
 
 
 def _parse_text_rec_bytes(
     data: bytes,
+    *,
+    validate: bool = False,
+    filename: Path | str = "<buffer>",
 ) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
     """Parse geometry from an in-memory buffer.
 
-    See `_parse_binary_rec_bytes` for why this is kept separate from
-    `_load_text_rec_file` rather than unifying the two.
+    Shares `_read_text_rec` with `_load_text_rec_file`: text parsing reads line by line
+    from a stream in both cases, so there is no peak-memory reason to keep two copies.
     """
     with io.StringIO(data.decode()) as f:
-        number_of_points = int(f.readline().strip())
-        points = (
-            np.loadtxt(f, max_rows=number_of_points, dtype=np.float64, ndmin=2)
-            if number_of_points > 0
-            else np.empty((0, 3), dtype=np.float64)
-        )
-
-        number_of_triangles = int(f.readline().strip())
-        triangles_and_labels = (
-            np.loadtxt(f, max_rows=number_of_triangles, dtype=np.int64, ndmin=2)
-            if number_of_triangles > 0
-            else np.empty((0, 5), dtype=np.int64)
-        )
-
-    return (
-        points,
-        triangles_and_labels[:, 0:3],
-        triangles_and_labels[:, 3:5],
-    )
+        return _read_text_rec(f, filename, validate=validate)
 
 
 def save_rec(

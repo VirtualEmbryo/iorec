@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, TextIO
 
+import numpy as np
+from numpy.typing import NDArray
+
+from iorec._validation import RecFormatError, _parse_count
 from iorec.rec_appendix import _iorec_version, write_rec_appendix
 
 
@@ -60,3 +65,47 @@ def _write_geometry_with_appendix(
     if appendix_bytes is not None:
         with Path(filename).open("ab") as file:
             file.write(appendix_bytes)
+
+
+def _read_text_count(
+    f: TextIO,
+    filename: Path | str,
+    what: str,
+    *,
+    validate: bool,
+) -> int:
+    """Read one count line of a text .rec file."""
+    line = f.readline()
+    if validate:
+        return _parse_count(filename, line, what)
+    return int(line.strip())
+
+
+def _read_text_rows(
+    f: TextIO,
+    count: int,
+    dtype: type[np.float64] | type[np.int64],
+    columns: int,
+    filename: Path | str,
+    what: str,
+    *,
+    validate: bool,
+) -> NDArray[Any]:
+    """Read `count` rows of a text .rec block, stopping exactly after the last one.
+
+    Without `validate`, behaviour is unchanged from earlier versions: `np.loadtxt`
+    errors propagate as they are, and a short block is returned short. With
+    `validate`, parse errors become `RecFormatError` and the caller checks the shape.
+    """
+    if count <= 0:
+        return np.empty((0, columns), dtype=dtype)
+    if not validate:
+        return np.loadtxt(f, max_rows=count, dtype=dtype, ndmin=2)
+    try:
+        with warnings.catch_warnings():
+            # An empty block is reported by the shape check, with the file name.
+            warnings.simplefilter("ignore", UserWarning)
+            return np.loadtxt(f, max_rows=count, dtype=dtype, ndmin=2)
+    except ValueError as exc:
+        error = f"{filename}: invalid {what} block: {exc}"
+        raise RecFormatError(error) from exc
