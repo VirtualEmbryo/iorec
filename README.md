@@ -14,7 +14,7 @@ or
 
 ## Usage
 
-There's four function: 
+Functions:
 
 For 3D .rec meshes:
 - iorec.load_rec()
@@ -28,6 +28,9 @@ Plus the optional metadata appendix (see below):
 - iorec.load_rec_appendix() — shared by both 2D and 3D
 - iorec.load_rec_with_metadata() — 3D, combines load_rec() and load_rec_appendix()
 - iorec.load_2d_rec_with_metadata() — 2D, combines load_2d_rec() and load_rec_appendix()
+
+Every reader takes an optional `validate=True` and then raises `iorec.RecFormatError` on
+a malformed file (see "Validation on read" below).
 
 ### load_rec
 
@@ -47,8 +50,8 @@ from pathlib import Path
 points, triangles, labels = iorec.load_rec(Path("file.rec"))
 
 # points: np.array of shape (num_points, 3) (float64)
-# triangles: np.array of shape (num_triangles, 3) (ulonglong)
-# labels: np.array of shape (num_triangles, 2) (uint)
+# triangles: np.array of shape (num_triangles, 3) (int64)
+# labels: np.array of shape (num_triangles, 2) (int64)
 
 # If you give a file that does not exist, it raises a FileNotFoundError:
 iorec.load_rec("NOT_AN_EXISTING_FILE.rec")  # raises FileNotFoundError
@@ -56,6 +59,30 @@ iorec.load_rec("NOT_AN_EXISTING_FILE.rec")  # raises FileNotFoundError
 iorec.load_rec("tests/assets/README.md")  # raises ValueError
 
 # Be sure have the rights to access the file too, etc...
+```
+
+### Validation on read
+
+Every reader takes an optional `validate=True` keyword. Without it (the default), files
+are read exactly as before, without checks: a truncated file or a 2D file read with
+`load_rec` can come back as wrong arrays. With it, the reader checks the file and raises
+`iorec.RecFormatError` (a `ValueError` subclass) naming the file and the first bad
+record:
+
+- binary files: size consistent with the declared counts (a trailing metadata appendix
+  is allowed, anything else after the geometry is not);
+- text files: valid counts, the declared number of rows, the expected number of columns,
+  nothing after the last record except an appendix;
+- all files: finite coordinates, vertex indices in `[0, num_points)`, non-negative labels,
+  and two different labels on each triangle (segment in 2D).
+
+```python
+import iorec
+
+try:
+    points, triangles, labels = iorec.load_rec("file.rec", validate=True)
+except iorec.RecFormatError as error:
+    print(error)
 ```
 
 ### save_rec
@@ -67,9 +94,19 @@ The file can be in binary or text mode. Binary is more compact but might not be 
 Arguments are:
 - filename (str | Path): where to save the mesh file.
 - points (NDArray[np.float64]): Mesh points.
-- triangles (NDArray[np.ulonglong]): Mesh triangles (topology).
-- labels (NDArray[np.uint]): Triangles multimaterial labels.
+- triangles (NDArray[np.int64]): Mesh triangles (topology).
+- labels (NDArray[np.int64]): Triangles multimaterial labels.
 - binary_mode (bool, optional): Choose binary mode. Defaults to False.
+- metadata (dict, optional, keyword only): fields of a trailing metadata appendix (see
+  below). Defaults to None (no appendix).
+- written_by (str, optional, keyword only): name and version of the program that
+  produced the mesh, stamped in the appendix. Defaults to None (iorec's own version).
+
+Arrays of other dtypes are converted to the file's types. Both modes store every value
+exactly: binary mode writes float64 coordinates, int64 indices and int32 labels,
+little-endian on every machine; text mode writes each coordinate with the shortest text
+that reads back to the same float64 (Python's `repr`), so a text file read back gives
+the same bits.
 
 ```python
 import iorec
@@ -108,9 +145,10 @@ Similar to save_rec in 3D. See its documentation.
 
 ```python
 import iorec
+import numpy as np
 
 # or arrays from your own code, of course !
-points, segments, labels = iorec.load_rec("tests/assets/text.rec")
+points, segments, labels = iorec.load_2d_rec("tests/assets/text_2d.rec")
 
 filename = "txt2d.rec"
 iorec.save_2d_rec(filename, points, segments, labels, binary_mode=False)
@@ -185,3 +223,15 @@ import iorec
 points, triangles, labels, metadata = iorec.load_rec_with_metadata("mesh.rec")
 # metadata is None if the file has no appendix
 ```
+
+## License
+
+Copyright (C) 2023-2026 Matthieu Perez and the iorec contributors.
+
+iorec is free software: you can redistribute it and/or modify it under the terms of the
+GNU General Public License as published by the Free Software Foundation, either version
+3 of the License, or (at your option) any later version (SPDX: `GPL-3.0-or-later`).
+
+iorec is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+PURPOSE. See the GNU General Public License in [LICENSE](LICENSE) for more details.

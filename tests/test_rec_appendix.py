@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Callable
 
 import numpy as np
 import pytest
@@ -69,6 +70,48 @@ def test_write_rec_appendix_rejects_non_ascii() -> None:
     """A non-ASCII metadata value raises before any file is written."""
     with pytest.raises(UnicodeEncodeError):
         write_rec_appendix({"spacing_unit": "µm"}, written_by="test 0.0.0")
+
+
+def test_write_rec_appendix_with_writer_library() -> None:
+    """`writer_library`, when given, is pinned right after `written_by`."""
+    metadata = {"coordinate_frame": "physical"}
+
+    block = write_rec_appendix(
+        metadata,
+        written_by="my-pipeline 2.1.0",
+        writer_library="iorec 1.0.9",
+    )
+
+    expected = (
+        b"# rec-appendix 1\n"
+        b"# written_by = my-pipeline 2.1.0\n"
+        b"# writer_library = iorec 1.0.9\n"
+        b"# coordinate_frame = physical\n"
+    )
+    assert block == expected
+
+
+def test_write_rec_appendix_omits_writer_library_by_default() -> None:
+    """`writer_library` is left out entirely when not given, unlike `written_by`."""
+    block = write_rec_appendix({}, written_by="test 0.0.0")
+
+    assert b"writer_library" not in block
+
+
+def test_write_rec_appendix_drops_writer_library_reserved_key() -> None:
+    """A caller-supplied `writer_library` in metadata is ignored, not duplicated."""
+    metadata = {"writer_library": "someone-else", "spacing_unit": "um"}
+
+    block = write_rec_appendix(
+        metadata,
+        written_by="test 0.0.0",
+        writer_library="iorec 1.0.9",
+    )
+
+    assert block.count(b"writer_library") == 1
+    parsed = _parse_rec_appendix(block.decode("ascii"))
+    assert parsed["writer_library"] == "iorec 1.0.9"
+    assert parsed["spacing_unit"] == "um"
 
 
 def _mesh_3d() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -149,6 +192,144 @@ def test_save_2d_rec_metadata_round_trip(tmp_path: Path, binary_mode: bool) -> N
     assert all(isinstance(v, float) for v in appendix["spacing"])
     assert all(isinstance(v, int) for v in appendix["source_shape"])
     assert all(isinstance(v, int) for v in appendix["crop_offset"])
+
+
+@pytest.mark.parametrize("binary_mode", [False, True])
+def test_save_rec_written_by_explicit_value(
+    tmp_path: Path,
+    binary_mode: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """save_rec(written_by=...) stamps it, and stamps iorec itself as writer_library."""
+    monkeypatch.setattr("iorec._utils._iorec_version", lambda: "1.0.9")
+    points, triangles, labels = _mesh_3d()
+    filename = tmp_path / "mesh.rec"
+
+    iorec.save_rec(
+        filename,
+        points,
+        triangles,
+        labels,
+        binary_mode=binary_mode,
+        metadata={"coordinate_frame": "voxel_index"},
+        written_by="my-pipeline 2.1.0",
+    )
+
+    appendix = iorec.load_rec_appendix(filename)
+    assert appendix is not None
+    assert appendix["written_by"] == "my-pipeline 2.1.0"
+    assert appendix["writer_library"] == "iorec 1.0.9"
+    assert appendix["coordinate_frame"] == "voxel_index"
+
+
+@pytest.mark.parametrize("binary_mode", [False, True])
+def test_save_2d_rec_written_by_explicit_value(
+    tmp_path: Path,
+    binary_mode: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """save_2d_rec(written_by=...) stamps it, and stamps iorec as writer_library."""
+    monkeypatch.setattr("iorec._utils._iorec_version", lambda: "1.0.9")
+    points, segments, labels = _mesh_2d()
+    filename = tmp_path / "mesh2d.rec"
+
+    iorec.save_2d_rec(
+        filename,
+        points,
+        segments,
+        labels,
+        binary_mode=binary_mode,
+        metadata={"coordinate_frame": "physical"},
+        written_by="my-pipeline 2.1.0",
+    )
+
+    appendix = iorec.load_rec_appendix(filename)
+    assert appendix is not None
+    assert appendix["written_by"] == "my-pipeline 2.1.0"
+    assert appendix["writer_library"] == "iorec 1.0.9"
+    assert appendix["coordinate_frame"] == "physical"
+
+
+def test_save_rec_written_by_reused_on_round_trip(tmp_path: Path) -> None:
+    """Feeding a loaded appendix back into save_rec doesn't duplicate writer_library.
+
+    Same guarantee as for `written_by` (see `test_metadata_round_trip_reuse`).
+    """
+    points, triangles, labels = _mesh_3d()
+    filename_a = tmp_path / "a.rec"
+    filename_b = tmp_path / "b.rec"
+
+    iorec.save_rec(
+        filename_a,
+        points,
+        triangles,
+        labels,
+        metadata={"coordinate_frame": "voxel_index"},
+        written_by="my-pipeline 2.1.0",
+    )
+    reused_metadata = iorec.load_rec_appendix(filename_a)
+    assert reused_metadata is not None
+
+    iorec.save_rec(
+        filename_b,
+        points,
+        triangles,
+        labels,
+        metadata=reused_metadata,
+        written_by="my-pipeline 2.1.0",
+    )
+
+    appendix_b = iorec.load_rec_appendix(filename_b)
+    assert appendix_b is not None
+    assert appendix_b["coordinate_frame"] == "voxel_index"
+    with filename_b.open("rb") as f:
+        content = f.read()
+    assert content.count(b"written_by") == 1
+    assert content.count(b"writer_library") == 1
+
+
+@pytest.mark.parametrize(
+    ("loader", "saver", "fixture", "binary_mode"),
+    [
+        (iorec.load_rec, iorec.save_rec, "tests/assets/text.rec", False),
+        (iorec.load_rec, iorec.save_rec, "tests/assets/binary.rec", True),
+        (iorec.load_2d_rec, iorec.save_2d_rec, "tests/assets/text_2d.rec", False),
+        (iorec.load_2d_rec, iorec.save_2d_rec, "tests/assets/binary_2d.rec", True),
+    ],
+)
+def test_written_by_default_is_byte_identical_to_omitting_it(
+    tmp_path: Path,
+    loader: Callable[[str], tuple[np.ndarray, np.ndarray, np.ndarray]],
+    saver: Callable[..., None],
+    fixture: str,
+    binary_mode: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`written_by=None` reproduces exactly what iorec always wrote.
+
+    No `writer_library` line, `written_by` stamped with iorec's own version -- over
+    each of the four format/dimensionality combinations in `tests/assets/`.
+    """
+    monkeypatch.setattr("iorec._utils._iorec_version", lambda: "1.0.9")
+    geometry = loader(fixture)
+    metadata = {"coordinate_frame": "voxel_index", "spacing": (1.0, 0.325, 0.325)}
+
+    omitted_path = tmp_path / "omitted.rec"
+    explicit_none_path = tmp_path / "explicit_none.rec"
+    saver(omitted_path, *geometry, binary_mode=binary_mode, metadata=metadata)
+    saver(
+        explicit_none_path,
+        *geometry,
+        binary_mode=binary_mode,
+        metadata=metadata,
+        written_by=None,
+    )
+
+    expected_appendix = write_rec_appendix(metadata, written_by="1.0.9")
+    omitted_bytes = omitted_path.read_bytes()
+    assert omitted_bytes == explicit_none_path.read_bytes()
+    assert omitted_bytes.endswith(expected_appendix)
+    assert b"writer_library" not in omitted_bytes
 
 
 def test_load_rec_appendix_none_when_absent() -> None:
