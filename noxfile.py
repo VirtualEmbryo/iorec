@@ -65,7 +65,9 @@ def check_manifest(session: nox.Session) -> None:
 DIR = Path(__file__).parent.resolve()
 
 
-@nox.session(python=["3.13", "3.14"])
+@nox.session(
+    python=["3.14"],
+)  # Only one version needed as it is a native python package (no compilation)
 def build(session: nox.Session) -> None:
     """(build) Build an SDist and wheel, locally."""
     build_p = DIR.joinpath("build")
