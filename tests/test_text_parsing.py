@@ -145,6 +145,14 @@ ERRORS = {
         MESH.replace("0.5", "0x1p-1"),
         "could not convert string '0x1p-1' to float64",
     ),
+    "hexadecimal_integer": (
+        MESH.replace("0 1 2 1 0", "0 0x1 2 1 0"),
+        "could not convert string '0x1' to int64",
+    ),
+    "nan_with_payload": (
+        MESH.replace("4.5 5 6", "4.5 nan(1) 6"),
+        "could not convert string 'nan\\(1\\)' to float64",
+    ),
     "underscore_in_number": (
         MESH.replace("1 2 3\n", "1 2 1_0\n"),
         "could not convert string '1_0' to float64",
@@ -325,3 +333,110 @@ def test_returned_arrays_layout(tmp_path: Path) -> None:
     assert triangles.base is labels.base
     assert triangles.base is not None
     assert triangles.base.shape == (2, 5)
+
+
+def _bits(array: np.ndarray) -> np.ndarray:
+    return array.view(np.uint64) if array.dtype == np.float64 else array
+
+
+def _random_mesh(count: int, dimension: int) -> tuple:
+    rng = np.random.default_rng(2)
+    points = (
+        rng.normal(size=(count, dimension))
+        * 10.0
+        ** rng.integers(-8, 8, count)[
+            :,
+            None,
+        ]
+    )
+    points[0, 0] = np.nan
+    points[1, 0] = -np.inf
+    points[2, 0] = -0.0
+    cells = rng.integers(0, count, size=(2 * count, dimension))
+    labels = np.stack([rng.integers(1, 5, 2 * count), np.zeros(2 * count)], axis=1)
+    return points, cells.astype(np.int64), labels.astype(np.int64)
+
+
+@pytest.mark.parametrize("dimension", [2, 3])
+@pytest.mark.parametrize("validate", [False, True])
+def test_large_file_matches_general_reader(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    dimension: int,
+    validate: bool,
+) -> None:
+    """A large file reads bit-identically with and without pyarrow, by both paths."""
+    pytest.importorskip("pyarrow")
+    points, cells, labels = _random_mesh(20000, dimension)
+    filename = tmp_path / "large.rec"
+    save = iorec.save_rec if dimension == 3 else iorec.save_2d_rec
+    load = iorec.load_rec if dimension == 3 else iorec.load_2d_rec
+    load_meta = (
+        iorec.load_rec_with_metadata
+        if dimension == 3
+        else iorec.load_2d_rec_with_metadata
+    )
+    save(filename, points, cells, labels, metadata={"spacing": (1.0,) * dimension})
+    assert filename.stat().st_size > _utils._FAST_TEXT_MIN_BYTES
+    kwargs = {"validate": validate}
+    if validate:  # the random mesh has non-finite points, so only compare errors
+        with pytest.raises(iorec.RecFormatError, match="non-finite"):
+            load(filename, **kwargs)
+        points = np.nan_to_num(points)
+        save(filename, points, cells, labels, metadata={"x": 1})
+        cells %= len(points)
+    fast = (load(filename, **kwargs), load_meta(filename, **kwargs)[:3])
+    monkeypatch.setattr(_utils, "_FAST_TEXT_MIN_BYTES", 10**12)
+    slow = (load(filename, **kwargs), load_meta(filename, **kwargs)[:3])
+    for fast_result, slow_result in zip(fast, slow):
+        for a, b in zip(fast_result, slow_result):
+            assert a.dtype == b.dtype
+            assert a.shape == b.shape
+            np.testing.assert_array_equal(_bits(a), _bits(b))
+
+
+def test_fast_parser_is_used_on_plain_text() -> None:
+    """The pyarrow parser accepts plain files and declines the unusual ones."""
+    fast_text = pytest.importorskip("iorec._fast_text")
+    pytest.importorskip("pyarrow")
+    for name in ("plain", "trailing_blank_lines", "no_final_newline", "exponent_forms"):
+        assert fast_text.parse_text_geometry(ACCEPTED[name].encode(), 3, 5)
+    for name in (
+        "windows_newlines",
+        "tabs",
+        "repeated_spaces",
+        "comment_at_end_of_row",
+    ):
+        assert fast_text.parse_text_geometry(ACCEPTED[name].encode(), 3, 5) is None
+    for text, _ in ERRORS.values():
+        assert fast_text.parse_text_geometry(text.encode(), 3, 5) is None
+
+
+def test_fast_parser_matches_numpy_on_special_values() -> None:
+    """Signed zeros, NaN signs, overflow and subnormals have the same bits as numpy."""
+    import io
+
+    fast_text = pytest.importorskip("iorec._fast_text")
+    pytest.importorskip("pyarrow")
+    for row in ("-nan NaN Inf", "1e400 -1e-400 5e-324", "-0.0 1e-310 2.5e-320"):
+        text = MESH.replace("4.5 5 6", row)
+        parsed = fast_text.parse_text_geometry(text.encode(), 3, 5)
+        assert parsed is not None
+        expected = np.loadtxt(
+            io.StringIO(text.split("\n", 1)[1]),
+            max_rows=4,
+            dtype=np.float64,
+            ndmin=2,
+        )
+        np.testing.assert_array_equal(_bits(parsed[0]), _bits(expected))
+
+
+def test_without_pyarrow_the_general_reader_is_used(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With pyarrow missing, big files read as before."""
+    fast_text = pytest.importorskip("iorec._fast_text")
+    monkeypatch.setattr(fast_text, "_pyarrow", lambda: None)
+    monkeypatch.setattr(_utils, "_FAST_TEXT_MIN_BYTES", 0)
+    _check_expected(iorec.load_rec(_write(tmp_path, MESH)))

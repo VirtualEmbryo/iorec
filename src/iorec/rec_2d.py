@@ -11,6 +11,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from iorec._utils import (
+    _fast_text_rec,
+    _fast_text_rec_file,
     _format_text_rec,
     _is_binary,
     _is_binary_bytes,
@@ -183,6 +185,9 @@ def _load_2d_text_rec_file(
     *,
     validate: bool = False,
 ) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
+    fast = _fast_text_rec_file(filename, 2, validate=validate)
+    if fast is not None:
+        return fast
     with Path.open(filename) as f:
         return _read_2d_text_rec(f, filename, validate=validate)
 
@@ -305,6 +310,9 @@ def _parse_2d_text_rec_bytes(
     by line from a stream in both cases, so there is no peak-memory reason to keep two
     copies.
     """
+    fast = _fast_text_rec(data, filename, 2, validate=validate)
+    if fast is not None:
+        return fast
     with io.StringIO(data.decode()) as f:
         return _read_2d_text_rec(f, filename, validate=validate)
 

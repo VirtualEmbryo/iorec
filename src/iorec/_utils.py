@@ -9,7 +9,13 @@ from typing import Any, Callable, TextIO
 import numpy as np
 from numpy.typing import NDArray
 
-from iorec._validation import RecFormatError, _parse_count
+from iorec._fast_text import parse_text_geometry
+from iorec._validation import (
+    RecFormatError,
+    _check_mesh,
+    _check_text_tail,
+    _parse_count,
+)
 from iorec.rec_appendix import _iorec_version, write_rec_appendix
 
 
@@ -65,6 +71,70 @@ def _write_geometry_with_appendix(
     if appendix_bytes is not None:
         with Path(filename).open("ab") as file:
             file.write(appendix_bytes)
+
+
+# Text files smaller than this are read by the general reader: the first import of
+# pyarrow costs more than parsing them.
+_FAST_TEXT_MIN_BYTES = 256 * 1024
+
+
+def _fast_text_rec(
+    data: bytes,
+    filename: Path | str,
+    dimension: int,
+    *,
+    validate: bool,
+) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]] | None:
+    """Parse text geometry with pyarrow, or return `None` for the general reader.
+
+    `None` means pyarrow is missing, the buffer is smaller than the size threshold, or
+    it is not plain well-formed text (any case the general reader accepts with another
+    result, or rejects, is left to it).
+
+    Args:
+        data: file content, geometry then optional appendix.
+        filename: used in error messages only.
+        dimension: 3 for triangle meshes, 2 for segment meshes.
+        validate: run the checks of `validate=True`.
+
+    Raises:
+        RecFormatError: with `validate`, if the parsed mesh is malformed.
+    """
+    if len(data) < _FAST_TEXT_MIN_BYTES:
+        return None
+    parsed = parse_text_geometry(data, dimension, dimension + 2)
+    if parsed is None:
+        return None
+    points, records, end = parsed
+    cells = records[:, 0:dimension]
+    labels = records[:, dimension : dimension + 2]
+    try:
+        tail = data[end:].decode()
+    except UnicodeDecodeError:
+        return None
+    if validate:
+        _check_text_tail(filename, tail)
+        _check_mesh(
+            filename,
+            points,
+            cells,
+            labels,
+            dimension,
+            (len(points), len(records)),
+        )
+    return points, cells, labels
+
+
+def _fast_text_rec_file(
+    filename: Path,
+    dimension: int,
+    *,
+    validate: bool,
+) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]] | None:
+    """Read a file for `_fast_text_rec`, skipping files below the size threshold."""
+    if filename.stat().st_size < _FAST_TEXT_MIN_BYTES:
+        return None
+    return _fast_text_rec(filename.read_bytes(), filename, dimension, validate=validate)
 
 
 def _read_text_count(
