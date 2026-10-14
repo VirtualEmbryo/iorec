@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "iorec"    # you'll be able to pip install this name
-version = "1.1.0"
+version = "1.2.0"
 # Who is an author or a maintainer ? There's no official definition.
 authors = [{ name = "Matthieu Perez", email = "matthieu.perez@cnrs.fr" }]
 maintainers = [{ name = "Matthieu Perez", email = "matthieu.perez@cnrs.fr" }]
@@ -40,8 +40,10 @@ dependencies = ["numpy"]
 
 # Optional installations
 [project.optional-dependencies]
+# Faster reading of large text .rec files (about 4 times; optional, same results)
+pyarrow = ["pyarrow"]
 # For the test environment
-test = ["pytest >=6", "pytest-cov >=3"]
+test = ["iorec[pyarrow]", "pytest >=6", "pytest-cov >=3"]
 # For actively developping the package
 dev = ["iorec[test]", "pipx", "nox", "mypy", "ruff"]
 

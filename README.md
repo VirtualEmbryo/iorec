@@ -36,7 +36,9 @@ a malformed file (see "Validation on read" below).
 
 Load a 3D .rec file into three numpy arrays of points, triangles and multi-material labels.
 
-The file can be in binary or text mode.
+The file can be in binary or text mode. Reading a large text file is about 4 times faster
+with `pip install iorec[pyarrow]` (installs `pyarrow`): same arrays, bit for bit, and unusual
+formatting falls back to the standard reader.
 
 ```python
 import iorec
