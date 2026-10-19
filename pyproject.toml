@@ -9,7 +9,7 @@ version = "1.2.0"
 # Who is an author or a maintainer ? There's no official definition.
 authors = [{ name = "Matthieu Perez", email = "matthieu.perez@cnrs.fr" }]
 maintainers = [{ name = "Matthieu Perez", email = "matthieu.perez@cnrs.fr" }]
-description = "Load and save .rec mesh files"
+description = "Load and save multimaterial meshes: .rec, Surface Evolver, PLY, OBJ, 3MF"
 readme = "README.md"                                                          # The long description is in this file
 license = "GPL-3.0-or-later"                                                  # SPDX expression (PEP 639)
 license-files = ["LICENSE"]
