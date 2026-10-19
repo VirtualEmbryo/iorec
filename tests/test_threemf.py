@@ -144,3 +144,54 @@ def test_not_a_3mf_package(tmp_path: Path) -> None:
     (tmp_path / "x.3mf").write_text("not a zip")
     with pytest.raises(iorec.MeshFormatError, match="not a readable 3MF package"):
         iorec.load_3mf(tmp_path / "x.3mf")
+
+
+def _foreign_model(tmp_path: Path, objects: str, build: str) -> Path:
+    model = (
+        f'<?xml version="1.0"?><model unit="millimeter" xmlns="{CORE[1:-1]}">'
+        f"<resources>{objects}</resources><build>{build}</build></model>"
+    )
+    path = tmp_path / "g.3mf"
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("3D/3dmodel.model", model)
+    return path
+
+
+TETRA = (
+    '<object id="1"><mesh><vertices><vertex x="0" y="0" z="0"/>'
+    '<vertex x="1" y="0" z="0"/><vertex x="0" y="1" z="0"/>'
+    '<vertex x="0" y="0" z="1"/></vertices><triangles>'
+    '<triangle v1="0" v2="2" v3="1"/><triangle v1="0" v2="1" v3="3"/>'
+    '<triangle v1="1" v2="2" v3="3"/><triangle v1="2" v2="0" v3="3"/>'
+    "</triangles></mesh></object>"
+)
+
+
+def test_components_compose_their_transforms(tmp_path: Path) -> None:
+    """A component is placed by its own transform, then by that of the build item."""
+    nested = (
+        TETRA + '<object id="2"><components><component objectid="1" '
+        'transform="1 0 0 0 1 0 0 0 1 0 3 0"/></components></object>'
+    )
+    path = _foreign_model(
+        tmp_path,
+        nested,
+        '<item objectid="2" transform="2 0 0 0 2 0 0 0 2 5 0 0"/>',
+    )
+    points, _, _ = iorec.load_3mf(path)
+    assert points.min(axis=0).tolist() == [5.0, 6.0, 0.0]
+    assert points.max(axis=0).tolist() == [7.0, 8.0, 2.0]
+
+
+def test_bad_object_references(tmp_path: Path) -> None:
+    """A missing object and an object containing itself are reported separately."""
+    path = _foreign_model(tmp_path, TETRA, '<item objectid="7"/>')
+    with pytest.raises(iorec.MeshFormatError, match="missing object '7'"):
+        iorec.load_3mf(path)
+    loop = (
+        '<object id="2"><components><component objectid="3"/></components></object>'
+        '<object id="3"><components><component objectid="2"/></components></object>'
+    )
+    path = _foreign_model(tmp_path, TETRA + loop, '<item objectid="2"/>')
+    with pytest.raises(iorec.MeshFormatError, match="contains itself"):
+        iorec.load_3mf(path)

@@ -90,6 +90,18 @@ def _cell_shells(
     ]
 
 
+def _split_shells(
+    labels: list[int],
+    sizes: list[int],
+    triangles: NDArray[np.int64],
+) -> list[tuple[int, NDArray[np.int64]]]:
+    """Cut consecutive runs of `sizes` triangles into the shells of `labels`."""
+    bounds = np.cumsum([0, *sizes])
+    return [
+        (label, triangles[bounds[k] : bounds[k + 1]]) for k, label in enumerate(labels)
+    ]
+
+
 def _open_half_edges(oriented: NDArray[np.int64]) -> int:
     """Count the half-edges of a triangle set that have no opposite half-edge.
 

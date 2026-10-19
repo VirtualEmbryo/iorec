@@ -31,6 +31,7 @@ from iorec._topology import (
     _merge_shells,
     _mesh_arrays,
     _resolve_mesh_path,
+    _split_shells,
 )
 from iorec._validation import MeshFormatError, _check_triangle_mesh
 from iorec.rec_appendix import _iorec_version
@@ -223,9 +224,5 @@ def _group_labels(
         cell_labels = [int(m.group(1)) for m in cells if m]
     else:
         cell_labels = list(range(1, len(groups) + 1))
-    bounds = np.cumsum([0, *sizes])
-    shells = [
-        (label, triangles[bounds[k] : bounds[k + 1]])
-        for k, label in enumerate(cell_labels)
-    ]
+    shells = _split_shells(cell_labels, sizes, triangles)
     return _merge_shells(shells, exterior_label, source)

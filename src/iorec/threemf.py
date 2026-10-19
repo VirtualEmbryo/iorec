@@ -35,6 +35,7 @@ from iorec._topology import (
     _mesh_arrays,
     _open_half_edges,
     _resolve_mesh_path,
+    _split_shells,
 )
 from iorec._validation import MeshFormatError, _check_triangle_mesh
 from iorec.rec_appendix import _iorec_version
@@ -65,9 +66,9 @@ _RELS = (
 )
 
 # A mesh object (vertices, triangles, iorec label or None), or a list of components.
-_Mesh = Tuple[NDArray[np.float64], NDArray[np.int64], Union[int, None]]
+_Part = Tuple[NDArray[np.float64], NDArray[np.int64], Union[int, None]]
 _Components = List[Tuple[str, NDArray[np.float64]]]
-_Objects = Dict[str, Union[_Mesh, _Components]]
+_Objects = Dict[str, Union[_Part, _Components]]
 
 
 def save_3mf(
@@ -235,10 +236,11 @@ def load_3mf(
         np.concatenate([s for _, s in shells]) if shells else np.empty((0, 3), np.int64)
     )
     points, triangles = _merge_coincident_vertices(points, triangles)
-    bounds = np.cumsum([0, *(len(s) for _, s in shells)])
-    shells = [
-        (lab, triangles[bounds[k] : bounds[k + 1]]) for k, (lab, _) in enumerate(shells)
-    ]
+    shells = _split_shells(
+        [lab for lab, _ in shells],
+        [len(s) for _, s in shells],
+        triangles,
+    )
     triangles, labels = _merge_shells(shells, exterior_label, path)
     if validate:
         _check_triangle_mesh(path, points, triangles, labels)
@@ -294,7 +296,7 @@ def _parse_objects(root: ElementTree.Element, source: Path) -> _Objects:
     return objects
 
 
-def _parse_mesh(obj: ElementTree.Element, mesh: ElementTree.Element) -> _Mesh:
+def _parse_mesh(obj: ElementTree.Element, mesh: ElementTree.Element) -> _Part:
     vertices = np.asarray(
         [[v.get("x"), v.get("y"), v.get("z")] for v in mesh.iter(f"{{{_CORE}}}vertex")],
         dtype=np.float64,
@@ -326,47 +328,39 @@ def _build_parts(
     *,
     use_transforms: bool,
     source: Path,
-) -> Iterator[_Mesh]:
+) -> Iterator[_Part]:
     """Yield every mesh placed on the build plate, in world coordinates if asked."""
-    for item in root.iter(f"{{{_CORE}}}item"):
-        matrix = _matrix(item.get("transform"))
-        yield from _expand(
-            item.get("objectid", ""),
-            matrix,
-            objects,
-            use_transforms,
-            source,
-            0,
-        )
-
-
-def _expand(
-    object_id: str,
-    matrix: NDArray[np.float64],
-    objects: _Objects,
-    use_transforms: bool,
-    source: Path,
-    depth: int,
-) -> Iterator[_Mesh]:
-    entry = objects.get(object_id)
-    if entry is None or depth > 32:
-        error = f"{source}: missing or cyclic object reference {object_id!r}."
-        raise MeshFormatError(error)
-    if isinstance(entry, tuple):
-        vertices, triangles, label = entry
-        if use_transforms:
-            vertices = vertices @ matrix[:3] + matrix[3]
-        yield vertices, triangles, label
-        return
-    for child, child_matrix in entry:
-        combined = np.vstack(
-            [child_matrix[:3] @ matrix[:3], child_matrix[3] @ matrix[:3] + matrix[3]],
-        )
-        yield from _expand(child, combined, objects, use_transforms, source, depth + 1)
+    stack = [
+        (item.get("objectid", ""), _matrix(item.get("transform")), ())
+        for item in reversed(list(root.iter(f"{{{_CORE}}}item")))
+    ]
+    while stack:
+        object_id, matrix, ancestors = stack.pop()
+        if object_id in ancestors:
+            error = f"{source}: object {object_id!r} contains itself."
+            raise MeshFormatError(error)
+        entry = objects.get(object_id)
+        if entry is None:
+            error = f"{source}: reference to the missing object {object_id!r}."
+            raise MeshFormatError(error)
+        if isinstance(entry, tuple):
+            vertices, triangles, label = entry
+            if use_transforms:
+                vertices = vertices @ matrix[:3] + matrix[3]
+            yield vertices, triangles, label
+            continue
+        for child, child_matrix in reversed(entry):
+            combined = np.vstack(
+                [
+                    child_matrix[:3] @ matrix[:3],
+                    child_matrix[3] @ matrix[:3] + matrix[3],
+                ],
+            )
+            stack.append((child, combined, (*ancestors, object_id)))
 
 
 def _join_parts(
-    parts: list[_Mesh],
+    parts: list[_Part],
 ) -> tuple[NDArray[np.float64], list[tuple[int, NDArray[np.int64]]]]:
     """Stack the vertices of all parts; label each part (1, 2, ... when unlabelled)."""
     offsets = np.cumsum([0, *(len(v) for v, _, _ in parts)])
