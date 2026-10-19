@@ -22,7 +22,7 @@ from numpy.typing import ArrayLike, NDArray
 
 from iorec._colors import interface_color, to_bytes
 from iorec._topology import _fan, _mesh_arrays, _resolve_mesh_path
-from iorec._validation import MeshFormatError, _check_mesh
+from iorec._validation import MeshFormatError, _check_triangle_mesh
 from iorec.rec_appendix import _iorec_version
 
 _TYPES = {
@@ -179,16 +179,7 @@ def load_ply(
     values = _read_elements(data, offset, elements, form, path)
     points, triangles, labels = _mesh_from_values(values, path)
     if validate:
-        counts = (len(points), len(triangles))
-        _check_mesh(
-            path,
-            points,
-            triangles,
-            labels,
-            3,
-            counts,
-            error_type=MeshFormatError,
-        )
+        _check_triangle_mesh(path, points, triangles, labels)
     return points, triangles, labels
 
 

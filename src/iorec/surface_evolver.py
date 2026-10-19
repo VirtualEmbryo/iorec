@@ -23,7 +23,7 @@ from numpy.typing import ArrayLike, NDArray
 
 from iorec._evolver_reader import parse_evolver
 from iorec._topology import _label_sides, _mesh_arrays, _resolve_mesh_path
-from iorec._validation import MeshFormatError, _check_mesh
+from iorec._validation import _check_triangle_mesh
 from iorec.rec_appendix import _iorec_version
 
 _SUFFIXES = (".fe", ".dmp")
@@ -81,16 +81,7 @@ def load_fe_with_attributes(
     text = path.read_text(encoding="latin-1")
     points, triangles, labels, attributes = parse_evolver(text, path, exterior_label)
     if validate:
-        counts = (len(points), len(triangles))
-        _check_mesh(
-            path,
-            points,
-            triangles,
-            labels,
-            3,
-            counts,
-            error_type=MeshFormatError,
-        )
+        _check_triangle_mesh(path, points, triangles, labels)
     return points, triangles, labels, attributes
 
 
@@ -146,10 +137,6 @@ def save_fe(
 
 
 def _check_bodies(labels: NDArray[np.int64], exterior_label: int) -> None:
-    same = np.flatnonzero(labels[:, 0] == labels[:, 1])
-    if same.size:
-        error = f"triangle {same[0]} has the same label on both sides."
-        raise ValueError(error)
     bodies = np.unique(labels[labels != exterior_label])
     if bodies.size and bodies[0] < 1:
         error = (

@@ -36,7 +36,7 @@ from iorec._topology import (
     _open_half_edges,
     _resolve_mesh_path,
 )
-from iorec._validation import MeshFormatError, _check_mesh
+from iorec._validation import MeshFormatError, _check_triangle_mesh
 from iorec.rec_appendix import _iorec_version
 
 _CORE = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"
@@ -242,16 +242,7 @@ def load_3mf(
     ]
     triangles, labels = _merge_shells(shells, exterior_label, path)
     if validate:
-        counts = (len(points), len(triangles))
-        _check_mesh(
-            path,
-            points,
-            triangles,
-            labels,
-            3,
-            counts,
-            error_type=MeshFormatError,
-        )
+        _check_triangle_mesh(path, points, triangles, labels)
     return points, triangles, labels
 
 

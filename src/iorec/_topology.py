@@ -15,7 +15,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from iorec._validation import MeshFormatError
+from iorec._validation import MeshFormatError, _check_mesh
 
 
 def _resolve_mesh_path(filename: str | Path, suffixes: tuple[str, ...]) -> Path:
@@ -35,33 +35,18 @@ def _mesh_arrays(
     triangles: ArrayLike,
     labels: ArrayLike,
 ) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]:
-    """Convert a mesh to float64/int64 arrays and check shapes, indices and values.
+    """Convert a mesh to float64/int64 arrays and check them with `_check_mesh`.
 
     Raises:
         ValueError: if a shape is wrong, a coordinate is not finite, a vertex index is
-            out of range or a label is negative.
+            out of range, a label is negative or a triangle separates a label from
+            itself.
     """
     pts = np.asarray(points, dtype=np.float64)
     tri = np.asarray(triangles, dtype=np.int64)
     lab = np.asarray(labels, dtype=np.int64)
-    if pts.ndim != 2 or pts.shape[1] != 3:
-        error = f"points must have shape (n, 3), got {pts.shape}."
-        raise ValueError(error)
-    if tri.ndim != 2 or tri.shape[1] != 3:
-        error = f"triangles must have shape (m, 3), got {tri.shape}."
-        raise ValueError(error)
-    if lab.shape != (len(tri), 2):
-        error = f"labels must have shape ({len(tri)}, 2), got {lab.shape}."
-        raise ValueError(error)
-    if not np.isfinite(pts).all():
-        error = "points contain a non-finite coordinate."
-        raise ValueError(error)
-    if tri.size and (tri.min() < 0 or tri.max() >= len(pts)):
-        error = f"triangles refer to vertices outside [0, {len(pts)})."
-        raise ValueError(error)
-    if lab.size and lab.min() < 0:
-        error = "labels must be non-negative."
-        raise ValueError(error)
+    counts = (len(pts) if pts.ndim else 0, len(tri) if tri.ndim else 0)
+    _check_mesh("mesh", pts, tri, lab, 3, counts, error_type=ValueError)
     return pts, tri, lab
 
 

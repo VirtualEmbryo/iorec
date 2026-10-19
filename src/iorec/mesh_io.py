@@ -73,8 +73,7 @@ def load_mesh(filename: str | Path, **options: Any) -> _Mesh:  # noqa: ANN401
         (points, triangles, labels): float64 (n, 3), int64 (m, 3) and int64 (m, 2).
     """
     reader = _READERS[_suffix(filename, _READERS, "read")]
-    points, triangles, labels = reader(filename, **options)
-    return points, triangles, labels
+    return reader(filename, **options)
 
 
 def save_mesh(
@@ -109,14 +108,13 @@ def convert(
     The metadata appendix of a .rec/.arec source is kept when the target is .rec or
     .arec too; for other targets it is dropped, with a warning.
     """
-    load_options = dict(load_options or {})
     save_options = dict(save_options or {})
     source_suffix = _suffix(source, _READERS, "read")
     target_suffix = _suffix(target, _WRITERS, "write")
     if source_suffix not in _REC:
-        save_mesh(target, *load_mesh(source, **load_options), **save_options)
+        save_mesh(target, *load_mesh(source, **(load_options or {})), **save_options)
         return
-    *mesh, metadata = load_rec_with_metadata(source, **load_options)
+    *mesh, metadata = load_rec_with_metadata(source, **(load_options or {}))
     if metadata is not None and target_suffix in _REC:
         save_options.setdefault("metadata", metadata)
     elif metadata is not None:

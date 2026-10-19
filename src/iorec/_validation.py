@@ -91,7 +91,7 @@ def _check_mesh(
     dimension: int,
     counts: tuple[int, int],
     *,
-    error_type: type[MeshFormatError] = RecFormatError,
+    error_type: type[ValueError] = RecFormatError,
 ) -> None:
     """Check shapes, coordinates, indices and labels of a parsed mesh.
 
@@ -102,11 +102,11 @@ def _check_mesh(
             `(counts[1], dimension)`.
         labels: parsed labels, expected shape `(counts[1], 2)`.
         dimension: 3 for triangle meshes, 2 for segment meshes.
-        counts: the point and cell counts declared in the file.
+        counts: the expected point and cell counts, e.g. those declared in the file.
         error_type: the exception raised, `RecFormatError` for .rec/.arec files.
 
     Raises:
-        MeshFormatError: `error_type`, on the first violated condition.
+        ValueError: `error_type`, on the first violated condition.
     """
     number_of_points, number_of_cells = counts
     cell_name = "triangle" if dimension == 3 else "segment"
@@ -119,7 +119,7 @@ def _check_mesh(
         if array.shape != shape:
             error = (
                 f"{filename}: {name} have shape {array.shape}, expected {shape} "
-                f"(file declares {number_of_points} points and {number_of_cells} "
+                f"(expected {number_of_points} points and {number_of_cells} "
                 f"{cell_name}s in {dimension}D)."
             )
             raise error_type(error)
@@ -158,3 +158,25 @@ def _check_mesh(
                 f"{labels[first, 0]} from itself."
             )
             raise error_type(error)
+
+
+def _check_triangle_mesh(
+    filename: Path | str,
+    points: NDArray[np.float64],
+    triangles: NDArray[np.int64],
+    labels: NDArray[np.int64],
+) -> None:
+    """Check a parsed triangle mesh of a format that declares no counts.
+
+    Raises:
+        MeshFormatError: if shapes, coordinates, indices or labels are invalid.
+    """
+    _check_mesh(
+        filename,
+        points,
+        triangles,
+        labels,
+        3,
+        (len(points), len(triangles)),
+        error_type=MeshFormatError,
+    )

@@ -32,7 +32,7 @@ from iorec._topology import (
     _mesh_arrays,
     _resolve_mesh_path,
 )
-from iorec._validation import MeshFormatError, _check_mesh
+from iorec._validation import MeshFormatError, _check_triangle_mesh
 from iorec.rec_appendix import _iorec_version
 
 _INTERFACE = re.compile(r"interface_(\d+)_(\d+)(?:\.\d+)?")
@@ -154,16 +154,7 @@ def load_obj(
         exterior_label = int(found.group(1)) if found else 0
     triangles, labels = _group_labels(groups, triangles, exterior_label, path)
     if validate:
-        counts = (len(points), len(triangles))
-        _check_mesh(
-            path,
-            points,
-            triangles,
-            labels,
-            3,
-            counts,
-            error_type=MeshFormatError,
-        )
+        _check_triangle_mesh(path, points, triangles, labels)
     return points, triangles, labels
 
 

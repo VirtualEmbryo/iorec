@@ -72,3 +72,18 @@ def test_command_line(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> Non
     with zipfile.ZipFile(target) as archive:
         model = archive.read("3D/3dmodel.model").decode()
     assert '<metadata name="cura:extruder_nr" preserve="1">1</metadata>' in model
+
+
+@pytest.mark.parametrize("suffix", [".fe", ".ply", ".obj", ".3mf"])
+def test_writers_refuse_invalid_mesh(tmp_path: Path, suffix: str) -> None:
+    """Every writer applies the checks of the readers, raising a plain ValueError."""
+    points = np.array([[0.0, 0, 0], [1, 0, 0], [0, 1, 0]])
+    bad = {
+        "outside": (points, [[0, 1, 3]], [[1, 0]]),
+        "negative label": (points, [[0, 1, 2]], [[-1, 0]]),
+        "itself": (points, [[0, 1, 2]], [[1, 1]]),
+        "non-finite": (points * np.nan, [[0, 1, 2]], [[1, 0]]),
+    }
+    for match, mesh in bad.items():
+        with pytest.raises(ValueError, match=match):
+            iorec.save_mesh(tmp_path / f"bad{suffix}", *mesh)
