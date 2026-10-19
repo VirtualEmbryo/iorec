@@ -51,3 +51,22 @@ def same_mesh() -> Callable[[Mesh, Mesh], bool]:
         return canonical(*first) == canonical(*second)
 
     return compare
+
+
+def signed_volumes(
+    points: np.ndarray,
+    triangles: np.ndarray,
+    labels: np.ndarray,
+) -> dict[int, float]:
+    """Volume enclosed by each label, from the divergence theorem on its triangles.
+
+    Exact for a closed cell surface; for an open one, the value depends on the origin.
+    """
+    p0, p1, p2 = (points[triangles[:, k]] for k in range(3))
+    six_volume = np.einsum("ij,ij->i", p0, np.cross(p1, p2))
+    volumes = {}
+    for label in np.unique(labels):
+        outward = six_volume[labels[:, 0] == label].sum()
+        inward = six_volume[labels[:, 1] == label].sum()
+        volumes[int(label)] = float(outward - inward) / 6.0
+    return volumes

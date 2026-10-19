@@ -9,10 +9,10 @@ from xml.etree import ElementTree
 
 import numpy as np
 import pytest
-from conftest import Mesh
+from conftest import Mesh, signed_volumes
 
 import iorec
-from iorec._topology import _open_half_edges, _signed_volumes
+from iorec._topology import _open_half_edges
 
 CORE = "{http://schemas.microsoft.com/3dmanufacturing/core/2015/02}"
 
@@ -44,7 +44,7 @@ def test_cells_are_closed_and_outward(tmp_path: Path, cells: Mesh) -> None:
         for o in _model(tmp_path / "c.3mf").iter(f"{CORE}object")
         if o.find(f"{CORE}mesh") is not None
     ]
-    volumes = _signed_volumes(*cells)
+    volumes = signed_volumes(*cells)
     assert len(objects) == 16
     for obj in objects:
         vertices = np.array(
@@ -58,7 +58,7 @@ def test_cells_are_closed_and_outward(tmp_path: Path, cells: Mesh) -> None:
         )
         label = int(obj.get("name").split()[1])
         assert _open_half_edges(triangles) == 0
-        enclosed = _signed_volumes(
+        enclosed = signed_volumes(
             vertices,
             triangles,
             np.tile([label, 0], (len(triangles), 1)),
@@ -125,7 +125,7 @@ def test_foreign_file_with_transforms(tmp_path: Path) -> None:
     points, triangles, labels = iorec.load_3mf(tmp_path / "f.3mf")
     assert len(points) == 8
     assert points.max(axis=0).tolist() == [7.0, 2.0, 2.0]
-    volumes = _signed_volumes(points, triangles, labels)
+    volumes = signed_volumes(points, triangles, labels)
     assert volumes[1] == pytest.approx(1 / 6)
     assert volumes[2] == pytest.approx(8 / 6)
 

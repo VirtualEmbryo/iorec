@@ -13,10 +13,9 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from conftest import Mesh
+from conftest import Mesh, signed_volumes
 
 import iorec
-from iorec._topology import _signed_volumes
 
 EVOLVER = os.environ.get("IOREC_EVOLVER") or next(
     (shutil.which(name) for name in ("evolver", "evolver-nox-d") if shutil.which(name)),
@@ -36,7 +35,7 @@ def _run_evolver(datafile: Path, commands: str) -> str:
         cwd=datafile.parent,
         check=False,
     )
-    return result.stdout
+    return result.stdout.replace("Enter command: ", "\n")
 
 
 def test_evolver_measures_the_same_volumes_and_area(
@@ -58,7 +57,7 @@ def test_evolver_measures_the_same_volumes_and_area(
     p0, p1, p2 = (points[triangles[:, k]] for k in range(3))
     expected_area = np.linalg.norm(np.cross(p1 - p0, p2 - p0), axis=1).sum() / 2
     assert area == pytest.approx(expected_area, rel=1e-13)
-    volumes = _signed_volumes(points, triangles, labels)
+    volumes = signed_volumes(points, triangles, labels)
     assert sorted(bodies) == list(range(1, 17))
     for label, volume in bodies.items():
         assert volume == pytest.approx(volumes[label], rel=1e-13)
@@ -77,6 +76,6 @@ def test_evolved_dump_reads_back(tmp_path: Path, cells: Mesh) -> None:
     assert np.array_equal(triangles, cells[1])
     assert np.array_equal(labels, cells[2])
     assert not np.array_equal(points, cells[0])
-    volumes = _signed_volumes(points, triangles, labels)
+    volumes = signed_volumes(points, triangles, labels)
     for label, target in attributes["volume"].items():
         assert volumes[label] == pytest.approx(target, rel=1e-6)

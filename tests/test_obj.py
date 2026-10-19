@@ -7,10 +7,10 @@ from typing import Callable
 
 import numpy as np
 import pytest
-from conftest import Mesh
+from conftest import Mesh, signed_volumes
 
 import iorec
-from iorec._topology import _cell_shells, _signed_volumes
+from iorec._topology import _cell_shells
 
 
 @pytest.mark.parametrize("group_by", ["interface", "cell"])
@@ -51,8 +51,8 @@ def test_objects_and_materials(tmp_path: Path, cells: Mesh) -> None:
     points, _, _ = cells
     cell_3 = (tmp_path / "c.obj").read_text().split("o cell_3\n")[1].split("\no ")[0]
     faces = [[int(v) - 1 for v in line.split()[1:]] for line in cell_3.splitlines()[1:]]
-    volume = _signed_volumes(points, np.array(faces), np.tile([3, 0], (len(faces), 1)))
-    assert volume[3] == pytest.approx(_signed_volumes(*cells)[3], rel=1e-12)
+    volume = signed_volumes(points, np.array(faces), np.tile([3, 0], (len(faces), 1)))
+    assert volume[3] == pytest.approx(signed_volumes(*cells)[3], rel=1e-12)
     assert volume[3] > 0
 
 

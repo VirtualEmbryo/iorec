@@ -237,22 +237,3 @@ def _fan(polygon: list[int]) -> list[list[int]]:
     return [
         [polygon[0], polygon[k], polygon[k + 1]] for k in range(1, len(polygon) - 1)
     ]
-
-
-def _signed_volumes(
-    points: NDArray[np.float64],
-    triangles: NDArray[np.int64],
-    labels: NDArray[np.int64],
-) -> dict[int, float]:
-    """Volume enclosed by each label, from the divergence theorem on its triangles.
-
-    Exact for a closed cell surface; for an open one, the value depends on the origin.
-    """
-    p0, p1, p2 = (points[triangles[:, k]] for k in range(3))
-    six_volume = np.einsum("ij,ij->i", p0, np.cross(p1, p2))
-    volumes = {}
-    for label in np.unique(labels):
-        outward = six_volume[labels[:, 0] == label].sum()
-        inward = six_volume[labels[:, 1] == label].sum()
-        volumes[int(label)] = float(outward - inward) / 6.0
-    return volumes

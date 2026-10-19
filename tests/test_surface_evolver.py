@@ -6,10 +6,9 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from conftest import ASSETS, Mesh
+from conftest import ASSETS, Mesh, signed_volumes
 
 import iorec
-from iorec._topology import _signed_volumes
 
 # A triangle (three vertices, three edges), to which each case adds facets.
 TRIANGLE = "vertices\n1 0 0 0\n2 1 0 0\n3 0 1 0\nedges\n1 1 2\n2 2 3\n3 3 1\n"
@@ -60,7 +59,7 @@ def test_quadrilaterals_split_around_centre() -> None:
     assert points[12 + 5].tolist() == [1.0, 0.5, 0.5]  # centre of the shared square
     assert (attributes["vertex_id"][12:] == 0).all()
     assert _area(points, triangles) == pytest.approx(11.0, rel=1e-15)
-    volumes = _signed_volumes(points, triangles, labels)
+    volumes = signed_volumes(points, triangles, labels)
     assert volumes[1] == pytest.approx(1.0, rel=1e-14)
     assert volumes[2] == pytest.approx(1.0, rel=1e-14)
     assert attributes["volume"] == {1: 1.0, 2: 1.0}
@@ -81,7 +80,7 @@ def test_evolver_dump_is_read() -> None:
     )
     assert triangles.shape == (176, 3)
     assert _area(points, triangles) == pytest.approx(9.26947364644248, rel=1e-13)
-    volumes = _signed_volumes(points, triangles, labels)
+    volumes = signed_volumes(points, triangles, labels)
     assert volumes[1] == pytest.approx(1.00000000083127, rel=1e-13)
     assert volumes[2] == pytest.approx(1.00000000083127, rel=1e-13)
     assert attributes["volume"] == {1: 1.0, 2: 1.0}
@@ -175,7 +174,7 @@ def test_lexical_rules(tmp_path: Path) -> None:
     assert triangles.tolist() == [[0, 2, 1], [0, 1, 3], [1, 2, 3], [2, 0, 3]]
     assert (labels == [1, 0]).all()
     assert attributes["tension"].tolist() == [2.5, 1.0, 1.0, 1.0]
-    assert _signed_volumes(points, triangles, labels)[1] == pytest.approx(1 / 6)
+    assert signed_volumes(points, triangles, labels)[1] == pytest.approx(1 / 6)
 
 
 @pytest.mark.parametrize(
