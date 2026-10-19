@@ -64,6 +64,12 @@ def test_rec_format_error_is_a_value_error() -> None:
     assert issubclass(iorec.RecFormatError, ValueError)
 
 
+def test_rec_format_error_is_a_mesh_format_error() -> None:
+    """Callers catching MeshFormatError also catch the .rec errors."""
+    assert issubclass(iorec.MeshFormatError, ValueError)
+    assert issubclass(iorec.RecFormatError, iorec.MeshFormatError)
+
+
 @pytest.mark.parametrize("reader", READERS_3D)
 @pytest.mark.parametrize("asset", ["tests/assets/binary.rec", "tests/assets/text.rec"])
 def test_valid_3d_assets_pass_unchanged(reader: Reader, asset: str) -> None:
