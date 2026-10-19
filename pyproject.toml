@@ -47,6 +47,9 @@ test = ["iorec[pyarrow]", "pytest >=6", "pytest-cov >=3"]
 # For actively developping the package
 dev = ["iorec[test]", "pipx", "nox", "mypy", "ruff"]
 
+[project.scripts]
+iorec-convert = "iorec.__main__:main"
+
 [project.urls]
 Homepage = "https://src.koda.cnrs.fr/turlierlab/iorec"
 "Bug Tracker" = "https://src.koda.cnrs.fr/turlierlab/iorec/issues"

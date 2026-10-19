@@ -41,7 +41,8 @@ Other 3D formats (see "Other formats" below):
 - iorec.load_obj(), iorec.save_obj()
 - iorec.load_3mf(), iorec.save_3mf()
 - iorec.load_mesh(), iorec.save_mesh(), iorec.convert() — format chosen by the suffix
-- `python -m iorec SOURCE TARGET` — conversion from the command line
+- `iorec-convert SOURCE TARGET` (or `python -m iorec SOURCE TARGET`) — conversion from
+  the command line
 
 Their readers raise `iorec.MeshFormatError` (of which `RecFormatError` is a subclass)
 for a malformed or unsupported file.
@@ -276,10 +277,10 @@ iorec.convert("cells.fe", "cells_copy.rec")
 From the command line:
 
 ```
-python -m iorec cells.rec cells.fe --fix-volumes --tension-file tensions.txt
-python -m iorec cells.dmp cells.rec --binary
-python -m iorec cells.rec cells.obj --group-by cell
-python -m iorec cells.rec cells.3mf --unit micron --scale 500 --extruder 3=1
+iorec-convert cells.rec cells.fe --fix-volumes --tension-file tensions.txt
+iorec-convert cells.dmp cells.rec --binary
+iorec-convert cells.rec cells.obj --group-by cell
+iorec-convert cells.rec cells.3mf --unit micron --scale 500 --extruder 3=1
 ```
 
 `iorec.convert` keeps the metadata appendix from `.rec` to `.rec`/`.arec`; the other

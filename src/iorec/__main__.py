@@ -1,11 +1,11 @@
-"""Command line conversion between mesh formats: `python -m iorec SOURCE TARGET`.
+"""Command line conversion between mesh formats: `iorec-convert SOURCE TARGET`.
 
-Examples::
+Also available as `python -m iorec SOURCE TARGET`. Examples::
 
-    python -m iorec cells.rec cells.fe --fix-volumes --tension-file tensions.txt
-    python -m iorec cells.dmp cells.rec --binary
-    python -m iorec cells.rec cells.obj --group-by cell
-    python -m iorec cells.rec cells.3mf --unit micron --scale 500 --extruder 3=1
+    iorec-convert cells.rec cells.fe --fix-volumes --tension-file tensions.txt
+    iorec-convert cells.dmp cells.rec --binary
+    iorec-convert cells.rec cells.obj --group-by cell
+    iorec-convert cells.rec cells.3mf --unit micron --scale 500 --extruder 3=1
 """
 
 from __future__ import annotations
@@ -22,9 +22,14 @@ from iorec.mesh_io import convert
 _EXTERIOR_READERS = (".fe", ".dmp", ".obj", ".3mf")
 
 
+def _program_name() -> str:
+    name = Path(sys.argv[0]).name
+    return "python -m iorec" if name == "__main__.py" else name
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="python -m iorec",
+        prog=_program_name(),
         description=(
             "Convert a labelled mesh between .rec/.arec, .fe/.dmp (Surface Evolver), "
             ".ply, .obj and .3mf, chosen by the file suffixes."
