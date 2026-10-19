@@ -138,3 +138,6 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# uv lockfile (library: not tracked)
+uv.lock
