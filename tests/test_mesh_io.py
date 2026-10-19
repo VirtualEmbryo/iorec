@@ -68,7 +68,9 @@ def test_command_line(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> Non
     assert np.array_equal(attributes["tension"], expected)
     assert "set body[16] target body[16].volume" in fe.read_text()
     target = tmp_path / "c.3mf"
-    assert main([str(fe), str(target), "--scale", "4", "--extruder", "2=1"]) == 0
+    with pytest.warns(UserWarning, match="facet tensions and body volumes"):
+        status = main([str(fe), str(target), "--scale", "4", "--extruder", "2=1"])
+    assert status == 0
     with zipfile.ZipFile(target) as archive:
         model = archive.read("3D/3dmodel.model").decode()
     assert '<metadata name="cura:extruder_nr" preserve="1">1</metadata>' in model
@@ -87,3 +89,34 @@ def test_writers_refuse_invalid_mesh(tmp_path: Path, suffix: str) -> None:
     for match, mesh in bad.items():
         with pytest.raises(ValueError, match=match):
             iorec.save_mesh(tmp_path / f"bad{suffix}", *mesh)
+
+
+def test_exterior_label_follows_the_conversion(tmp_path: Path, cells: Mesh) -> None:
+    """A stored exterior label other than 0 reaches the writer of the target."""
+    points, triangles, labels = cells
+    shifted = labels + 1
+    iorec.save_3mf(tmp_path / "a.3mf", points, triangles, shifted, exterior_label=1)
+    iorec.convert(tmp_path / "a.3mf", tmp_path / "b.obj")
+    assert "iorec exterior_label 1" in (tmp_path / "b.obj").read_text()
+    assert iorec.load_obj(tmp_path / "b.obj")[2].min() == 1
+    iorec.convert(
+        tmp_path / "b.obj",
+        tmp_path / "c.3mf",
+        save_options={"exterior_label": 1},
+    )
+    assert iorec.load_3mf(tmp_path / "c.3mf")[2].min() == 1
+    iorec.convert(tmp_path / "a.3mf", tmp_path / "d.fe")
+    assert "label 1 is the exterior" in (tmp_path / "d.fe").read_text()
+
+
+def test_evolver_extras_are_kept_or_reported(tmp_path: Path, cells: Mesh) -> None:
+    """Tensions and volume targets follow .fe -> .fe; other targets warn."""
+    iorec.save_fe(tmp_path / "a.fe", *cells, tensions=0.5, volumes={3: 7.5})
+    iorec.convert(tmp_path / "a.fe", tmp_path / "b.fe")
+    _, _, _, attributes = iorec.load_fe_with_attributes(tmp_path / "b.fe")
+    assert np.all(attributes["tension"] == 0.5)
+    assert attributes["volume"] == {3: 7.5}
+    with pytest.warns(UserWarning, match="facet tensions and body volumes"):
+        iorec.convert(tmp_path / "a.fe", tmp_path / "a.ply")
+    iorec.save_fe(tmp_path / "plain.fe", *cells)
+    iorec.convert(tmp_path / "plain.fe", tmp_path / "plain.ply")

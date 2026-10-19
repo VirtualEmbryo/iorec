@@ -38,6 +38,7 @@ from iorec.rec_appendix import _iorec_version
 _INTERFACE = re.compile(r"interface_(\d+)_(\d+)(?:\.\d+)?")
 _CELL = re.compile(r"cell_(\d+)(?:\.\d+)?")
 _EXTERIOR_COMMENT = re.compile(r"#\s*iorec exterior_label\s+(\d+)")
+_SUFFIXES = (".obj",)
 
 
 def save_obj(
@@ -141,7 +142,7 @@ def load_obj(
     Returns:
         (points, triangles, labels): float64 (n, 3), int64 (m, 3) and int64 (m, 2).
     """
-    path = _resolve_mesh_path(filename, (".obj",))
+    path = _resolve_mesh_path(filename, _SUFFIXES)
     text = path.read_text(encoding="utf-8", errors="replace")
     points, groups = _parse_obj(text, path)
     triangles = np.concatenate(
@@ -150,12 +151,22 @@ def load_obj(
     if merge_vertices:
         points, triangles = _merge_coincident_vertices(points, triangles)
     if exterior_label is None:
-        found = _EXTERIOR_COMMENT.search(text)
-        exterior_label = int(found.group(1)) if found else 0
+        exterior_label = _exterior_label_of(text)
     triangles, labels = _group_labels(groups, triangles, exterior_label, path)
     if validate:
         _check_triangle_mesh(path, points, triangles, labels)
     return points, triangles, labels
+
+
+def _stored_exterior_label(filename: str | Path) -> int:
+    """The exterior label iorec wrote in an OBJ file, or 0."""
+    path = _resolve_mesh_path(filename, _SUFFIXES)
+    return _exterior_label_of(path.read_text(encoding="utf-8", errors="replace"))
+
+
+def _exterior_label_of(text: str) -> int:
+    found = _EXTERIOR_COMMENT.search(text)
+    return int(found.group(1)) if found else 0
 
 
 def _parse_obj(

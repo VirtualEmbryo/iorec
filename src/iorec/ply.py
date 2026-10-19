@@ -43,6 +43,7 @@ _TYPES = {
     "double": "f8",
     "float64": "f8",
 }
+_SUFFIXES = (".ply",)
 _ENDIAN = {"binary_little_endian": "<", "binary_big_endian": ">", "ascii": None}
 _INDEX_NAMES = ("vertex_indices", "vertex_index")
 
@@ -173,7 +174,7 @@ def load_ply(
     Raises:
         MeshFormatError: if the file is not a PLY mesh or is truncated.
     """
-    path = _resolve_mesh_path(filename, (".ply",))
+    path = _resolve_mesh_path(filename, _SUFFIXES)
     data = path.read_bytes()
     form, elements, offset = _parse_header(data, path)
     values = _read_elements(data, offset, elements, form, path)

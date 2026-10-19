@@ -39,6 +39,7 @@ from iorec._topology import (
 from iorec._validation import MeshFormatError, _check_triangle_mesh
 from iorec.rec_appendix import _iorec_version
 
+_SUFFIXES = (".3mf",)
 _CORE = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"
 _CURA = "http://software.ultimaker.com/xml/cura/3mf/2015/10"
 _IOREC = "https://src.koda.cnrs.fr/turlierlab/iorec"
@@ -219,11 +220,9 @@ def load_3mf(
     Returns:
         (points, triangles, labels): float64 (n, 3), int64 (m, 3) and int64 (m, 2).
     """
-    path = _resolve_mesh_path(filename, (".3mf",))
+    path = _resolve_mesh_path(filename, _SUFFIXES)
     root = _read_model(path)
-    metadata = {
-        m.get("name"): (m.text or "").strip() for m in root.iter(f"{{{_CORE}}}metadata")
-    }
+    metadata = _metadata(root)
     written_by_iorec = "iorec:exterior_label" in metadata
     if exterior_label is None:
         exterior_label = int(metadata.get("iorec:exterior_label", 0))
@@ -244,6 +243,18 @@ def load_3mf(
     if validate:
         _check_triangle_mesh(path, points, triangles, labels)
     return points, triangles, labels
+
+
+def _stored_exterior_label(filename: str | Path) -> int:
+    """The exterior label iorec wrote in a 3MF file, or 0."""
+    root = _read_model(_resolve_mesh_path(filename, _SUFFIXES))
+    return int(_metadata(root).get("iorec:exterior_label", 0))
+
+
+def _metadata(root: ElementTree.Element) -> dict[str | None, str]:
+    return {
+        m.get("name"): (m.text or "").strip() for m in root.iter(f"{{{_CORE}}}metadata")
+    }
 
 
 def _read_model(path: Path) -> ElementTree.Element:

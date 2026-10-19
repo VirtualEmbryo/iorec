@@ -18,13 +18,15 @@ from iorec._validation import (
 )
 from iorec.rec_appendix import _iorec_version, write_rec_appendix
 
+_SUFFIXES = (".rec", ".arec")
+
 
 def _resolve_rec_path(filename: str | Path) -> Path:
     filename = Path(filename).resolve()
     if not filename.exists():
         error = f"{filename} not found."
         raise FileNotFoundError(error)
-    if filename.suffix not in (".rec", ".arec"):
+    if filename.suffix not in _SUFFIXES:
         error = f"{filename} is not a .rec or .arec file."
         raise ValueError(error)
     return filename

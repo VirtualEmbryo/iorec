@@ -17,9 +17,7 @@ from typing import Any
 
 import numpy as np
 
-from iorec.mesh_io import convert
-
-_EXTERIOR_READERS = (".fe", ".dmp", ".obj", ".3mf")
+from iorec.mesh_io import _accepted_options, convert
 
 
 def _program_name() -> str:
@@ -38,7 +36,13 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("source", type=Path, help="mesh file to read")
     parser.add_argument("target", type=Path, help="mesh file to write")
     parser.add_argument("--validate", action="store_true", help="check the source")
-    parser.add_argument("--exterior-label", type=int, default=0, metavar="N")
+    parser.add_argument(
+        "--exterior-label",
+        type=int,
+        default=None,
+        metavar="N",
+        help="label of the exterior; default: the one stored in .obj/.3mf, else 0",
+    )
     encoding = parser.add_mutually_exclusive_group()
     encoding.add_argument("--binary", action="store_true", help=".rec/.ply: binary")
     encoding.add_argument("--text", action="store_true", help=".rec/.ply: text")
@@ -74,21 +78,16 @@ def _read_tensions(path: Path) -> dict[tuple[int, int], float]:
 
 def _save_options(args: argparse.Namespace) -> dict[str, Any]:
     """Keyword arguments of the writer of the target format."""
-    suffix = args.target.suffix.lower()
     options: dict[str, Any] = {}
-    if suffix in (".rec", ".arec", ".ply") and (args.binary or args.text):
+    if args.binary or args.text:
         options["binary_mode"] = args.binary
-    if suffix in (".ply", ".obj", ".3mf", ".fe"):
-        options["exterior_label"] = args.exterior_label
-    if suffix == ".ply":
-        options["colors"] = args.colors
-    if suffix == ".obj" and args.group_by:
+    if args.colors:
+        options["colors"] = True
+    if args.group_by:
         options["group_by"] = args.group_by
-    if suffix == ".3mf":
-        options.update(_print_options(args))
-    if suffix == ".fe":
-        options.update(_evolver_options(args))
-    return options
+    options.update(_print_options(args), **_evolver_options(args))
+    accepted = _accepted_options(args.target, "write")
+    return {key: value for key, value in options.items() if key in accepted}
 
 
 def _print_options(args: argparse.Namespace) -> dict[str, Any]:
@@ -115,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
     """Run the conversion; return the process exit status."""
     args = _parser().parse_args(argv)
     load_options: dict[str, Any] = {"validate": args.validate}
-    if args.source.suffix.lower() in _EXTERIOR_READERS:
+    if args.exterior_label is not None:
         load_options["exterior_label"] = args.exterior_label
     try:
         convert(
