@@ -64,6 +64,12 @@ def test_rec_format_error_is_a_value_error() -> None:
     assert issubclass(iorec.RecFormatError, ValueError)
 
 
+def test_rec_format_error_is_a_mesh_format_error() -> None:
+    """Callers catching MeshFormatError also catch the .rec errors."""
+    assert issubclass(iorec.MeshFormatError, ValueError)
+    assert issubclass(iorec.RecFormatError, iorec.MeshFormatError)
+
+
 @pytest.mark.parametrize("reader", READERS_3D)
 @pytest.mark.parametrize("asset", ["tests/assets/binary.rec", "tests/assets/text.rec"])
 def test_valid_3d_assets_pass_unchanged(reader: Reader, asset: str) -> None:
@@ -99,12 +105,15 @@ def test_2d_file_read_as_3d_is_rejected(reader: Reader, asset: str) -> None:
         reader(asset, validate=True)
 
 
-def test_default_behaviour_is_unchanged_on_a_malformed_file() -> None:
-    """Without `validate`, a 2D binary file still reads as 3D without error."""
-    points, triangles, labels = iorec.load_rec("tests/assets/binary_2d.rec")
-    assert points.shape == (468, 3)
-    assert triangles.shape[1] == 3
-    assert labels.shape[1] == 2
+def test_default_behaviour_is_unchanged_on_a_malformed_file(tmp_path: Path) -> None:
+    """Without `validate`, a binary file with trailing garbage still reads fine."""
+    expected = _tetrahedron()
+    filename = tmp_path / "garbage.rec"
+    filename.write_bytes(_binary_3d(*expected) + b"trailing garbage")
+    with pytest.raises(iorec.RecFormatError):
+        iorec.load_rec(filename, validate=True)
+    for read, wanted in zip(iorec.load_rec(filename), expected):
+        assert np.array_equal(read, wanted)
 
 
 @pytest.mark.parametrize("reader", READERS_3D)

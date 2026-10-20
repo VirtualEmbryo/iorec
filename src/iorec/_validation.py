@@ -16,7 +16,11 @@ from numpy.typing import NDArray
 from iorec.rec_appendix import _appendix_marker
 
 
-class RecFormatError(ValueError):
+class MeshFormatError(ValueError):
+    """Raised by the readers for a malformed or unsupported mesh file, of any format."""
+
+
+class RecFormatError(MeshFormatError):
     """Raised by the readers, with `validate=True`, for a malformed .rec/.arec file."""
 
 
@@ -86,6 +90,8 @@ def _check_mesh(
     labels: NDArray[np.int64],
     dimension: int,
     counts: tuple[int, int],
+    *,
+    error_type: type[ValueError] = RecFormatError,
 ) -> None:
     """Check shapes, coordinates, indices and labels of a parsed mesh.
 
@@ -96,10 +102,11 @@ def _check_mesh(
             `(counts[1], dimension)`.
         labels: parsed labels, expected shape `(counts[1], 2)`.
         dimension: 3 for triangle meshes, 2 for segment meshes.
-        counts: the point and cell counts declared in the file.
+        counts: the expected point and cell counts, e.g. those declared in the file.
+        error_type: the exception raised, `RecFormatError` for .rec/.arec files.
 
     Raises:
-        RecFormatError: on the first violated condition.
+        ValueError: `error_type`, on the first violated condition.
     """
     number_of_points, number_of_cells = counts
     cell_name = "triangle" if dimension == 3 else "segment"
@@ -112,15 +119,15 @@ def _check_mesh(
         if array.shape != shape:
             error = (
                 f"{filename}: {name} have shape {array.shape}, expected {shape} "
-                f"(file declares {number_of_points} points and {number_of_cells} "
+                f"(expected {number_of_points} points and {number_of_cells} "
                 f"{cell_name}s in {dimension}D)."
             )
-            raise RecFormatError(error)
+            raise error_type(error)
 
     not_finite = np.flatnonzero(~np.isfinite(points).all(axis=1))
     if not_finite.size:
         error = f"{filename}: point {not_finite[0]} has a non-finite coordinate."
-        raise RecFormatError(error)
+        raise error_type(error)
 
     if number_of_cells:
         out_of_range = np.flatnonzero(
@@ -132,7 +139,7 @@ def _check_mesh(
                 f"{filename}: {cell_name} {first} has a vertex index outside "
                 f"[0, {number_of_points}): {cells[first].tolist()}."
             )
-            raise RecFormatError(error)
+            raise error_type(error)
 
         negative = np.flatnonzero((labels < 0).any(axis=1))
         if negative.size:
@@ -141,7 +148,7 @@ def _check_mesh(
                 f"{filename}: {cell_name} {first} has a negative label: "
                 f"{labels[first].tolist()}."
             )
-            raise RecFormatError(error)
+            raise error_type(error)
 
         same = np.flatnonzero(labels[:, 0] == labels[:, 1])
         if same.size:
@@ -150,4 +157,26 @@ def _check_mesh(
                 f"{filename}: {cell_name} {first} separates label "
                 f"{labels[first, 0]} from itself."
             )
-            raise RecFormatError(error)
+            raise error_type(error)
+
+
+def _check_triangle_mesh(
+    filename: Path | str,
+    points: NDArray[np.float64],
+    triangles: NDArray[np.int64],
+    labels: NDArray[np.int64],
+) -> None:
+    """Check a parsed triangle mesh of a format that declares no counts.
+
+    Raises:
+        MeshFormatError: if shapes, coordinates, indices or labels are invalid.
+    """
+    _check_mesh(
+        filename,
+        points,
+        triangles,
+        labels,
+        3,
+        (len(points), len(triangles)),
+        error_type=MeshFormatError,
+    )

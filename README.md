@@ -2,7 +2,10 @@
 
 Small utility to load and save .rec mesh files from MultiTracker.
 
-It works with both 3D and 2D .rec meshes.
+It works with both 3D and 2D .rec meshes. 3D meshes can also be read and written as
+Surface Evolver datafiles (`.fe`, and `.dmp` dumps), PLY, OBJ (Blender) and 3MF (3D
+printing), keeping the two material labels of every triangle (see "Other formats"
+below).
 
 ## Installation
 
@@ -31,6 +34,18 @@ Plus the optional metadata appendix (see below):
 
 Every reader takes an optional `validate=True` and then raises `iorec.RecFormatError` on
 a malformed file (see "Validation on read" below).
+
+Other 3D formats (see "Other formats" below):
+- iorec.load_fe(), iorec.load_fe_with_attributes(), iorec.save_fe() — Surface Evolver
+- iorec.load_ply(), iorec.save_ply()
+- iorec.load_obj(), iorec.save_obj()
+- iorec.load_3mf(), iorec.save_3mf()
+- iorec.load_mesh(), iorec.save_mesh(), iorec.convert() — format chosen by the suffix
+- `iorec-convert SOURCE TARGET` (or `python -m iorec SOURCE TARGET`) — conversion from
+  the command line
+
+Their readers raise `iorec.MeshFormatError` (of which `RecFormatError` is a subclass)
+for a malformed or unsupported file.
 
 ### load_rec
 
@@ -225,6 +240,127 @@ import iorec
 points, triangles, labels, metadata = iorec.load_rec_with_metadata("mesh.rec")
 # metadata is None if the file has no appendix
 ```
+
+## Other formats: Surface Evolver, PLY, OBJ, 3MF
+
+All formats share the convention of `.rec` files: `points` (n, 3), `triangles` (m, 3)
+and `labels` (m, 2), where the normal of triangle `i` (right-hand rule on its vertex
+order) points **from `labels[i, 0]` to `labels[i, 1]`**. Label 0 is the exterior
+medium by default (`exterior_label=0` wherever it matters).
+
+| suffix | format | what is stored | round trip back to `.rec` |
+|---|---|---|---|
+| `.fe` (read also `.dmp`) | Surface Evolver datafile | one body per label, facet tensions, volume targets | same arrays, bit for bit |
+| `.ply` | PLY, binary or text | the nonmanifold mesh, labels as face properties `label0`, `label1` | same arrays, bit for bit |
+| `.obj` + `.mtl` | Wavefront OBJ | one coloured object per interface, or per cell | same mesh (*) |
+| `.3mf` | 3MF (3D printing) | one closed, outward surface per cell, colour, unit, scale, Cura extruder | same mesh (*) |
+
+(*) Same points and labelled triangles, up to the order of triangles (and of vertices
+for 3MF) and the orientation convention: a triangle with labels `(b, a)`, `b > a`,
+may come back reversed with labels `(a, b)`. It is the same interface.
+
+```python
+import iorec
+
+points, triangles, labels = iorec.load_rec("tests/assets/binary.rec")
+
+iorec.save_fe("cells.fe", points, triangles, labels, volumes="current")
+iorec.save_ply("cells.ply", points, triangles, labels)
+iorec.save_obj("cells.obj", points, triangles, labels)  # and cells.mtl
+iorec.save_3mf("cells.3mf", points, triangles, labels, scale=5.0)
+
+# Or choose the format by suffix, and convert files directly:
+points, triangles, labels = iorec.load_mesh("cells.ply")
+iorec.convert("cells.fe", "cells_copy.rec")
+```
+
+From the command line:
+
+```
+iorec-convert cells.rec cells.fe --fix-volumes --tension-file tensions.txt
+iorec-convert cells.dmp cells.rec --binary
+iorec-convert cells.rec cells.obj --group-by cell
+iorec-convert cells.rec cells.3mf --unit micron --scale 500 --extruder 3=1
+```
+
+`iorec.convert` keeps the metadata appendix from `.rec` to `.rec`/`.arec`; the other
+formats do not hold it, and a warning says so.
+
+### Surface Evolver (`.fe`, `.dmp`)
+
+Surface Evolver describes a multimaterial surface with bodies: body `k` lists its
+facets, `+f` when the normal of facet `f` points out of the body, `-f` when it points
+in. `save_fe` writes body `k` for label `k` (labels need not be consecutive, and
+`keep_originals` makes `body[k]` refer to label `k` in Evolver commands) and no body
+for the exterior. Each triangle `(v0, v1, v2)` becomes the edge loop
+`v0->v1, v1->v2, v2->v0`, so reading the datafile back gives the same arrays.
+
+```python
+iorec.save_fe(
+    "cells.fe", points, triangles, labels,
+    tensions={(0, 1): 0.5, (1, 2): 1.0, ...},  # or a number, or one value per triangle
+    volumes="current",            # or {label: target volume}, or None
+    read_commands="g 10",         # Evolver commands run after loading
+)
+points, triangles, labels, attributes = iorec.load_fe_with_attributes("cells.dmp")
+attributes["tension"]  # per triangle, 1 where unset
+attributes["volume"]   # {label: target volume}
+```
+
+`load_fe` reads the files written by `save_fe`, hand-written datafiles with numeric
+coordinates (facets with more than three edges are split around a centre vertex, as
+Evolver does), and the output of the Evolver `dump` command. Evolver dumps write
+coordinates with 15 significant digits, so points read from a dump differ from the
+float64 originals by a few 1e-15 (relative). Commands after `read` are ignored.
+Other models (string, quadratic, Lagrange, simplex, torus, symmetry groups),
+parametric boundaries and coordinates given by expressions raise
+`iorec.MeshFormatError`: load such a file in Evolver and read its dump instead.
+Bodies closed partly by constraints (walls without facets) are read, but their volume
+cannot be computed from the facets alone.
+
+### PLY (`.ply`)
+
+The exact exchange format: double coordinates, int vertex indices and two int face
+properties `label0`, `label1`, in binary little-endian (default) or text
+(`binary_mode=False`); `colors=True` adds a colour per face. Any PLY with `vertex`
+and `face` elements can be read; faces without labels get labels `(1, 0)`. Blender
+imports the geometry of a PLY but not its face properties: use OBJ for Blender.
+
+### OBJ (`.obj` + `.mtl`), for Blender
+
+`save_obj` writes one OBJ object per interface (`interface_<a>_<b>`, a < b, normals
+from a to b), or with `group_by="cell"` one closed surface per cell (`cell_<k>`,
+normals outward; a triangle between two cells is then written in both). Each object
+gets a material of the same name and colour in the `.mtl` file. In Blender, *File >
+Import > Wavefront (.obj)* gives one coloured object per interface or per cell. Files
+re-exported by Blender hold a copy of shared vertices in each object: read them with
+`load_obj(..., merge_vertices=True)`.
+
+### 3MF (`.3mf`), for 3D printing
+
+3MF holds closed surfaces, so `save_3mf` writes the surface of each cell (all labels
+but the exterior) as one part of an assembly; cells stay in place when the slicer
+moves the assembly. Coordinates are written exactly; the printed size is
+`coordinates * scale` in `unit` (`"micron"`, `"millimeter"`, ...), and the lowest
+corner of the assembly is put on the build plate. A cell whose surface is not closed
+is still written, with a warning, since a slicer may repair or reject it.
+
+For an Ultimaker S5 (two extruders) with Cura, `extruders={label: 0 or 1}` sets the
+extruder of each cell (Cura's `extruder_nr`, 0 for the first one), for instance to
+print one cell in a second colour or in a soluble material:
+
+```python
+# An aggregate about 6 units wide, printed 10 cm wide; cell 7 on the second extruder.
+extruders = {label: 0 for label in range(1, 17)}
+extruders[7] = 1
+iorec.save_3mf("aggregate.3mf", points, triangles, labels, unit="millimeter",
+               scale=100 / 6, extruders=extruders)
+```
+
+Open the file in Cura (*File > Open*): Cura reads the extruder of each part from
+`cura:extruder_nr` and keeps the parts together as a group. Other slicers
+(PrusaSlicer, Bambu Studio) read the parts and their colours; their extruders are set
+in the slicer.
 
 ## License
 
