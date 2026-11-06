@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2023-2026 the iorec authors
 """Read, write and convert labelled meshes in any supported format, chosen by suffix.
 
 ======================  =========================  ================================
@@ -19,9 +21,10 @@ from __future__ import annotations
 
 import inspect
 import warnings
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Tuple
+from typing import Any
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -30,7 +33,7 @@ from iorec import obj, ply, surface_evolver, threemf
 from iorec._utils import _SUFFIXES as _REC_SUFFIXES
 from iorec.rec_3d import load_rec, load_rec_with_metadata, save_rec
 
-_Mesh = Tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]
+_Mesh = tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64]]
 
 
 @dataclass(frozen=True)
@@ -99,7 +102,11 @@ def load_mesh(filename: str | Path, **options: Any) -> _Mesh:  # noqa: ANN401
     Returns:
         (points, triangles, labels): float64 (n, 3), int64 (m, 3) and int64 (m, 2).
     """
-    return _READERS[_suffix(filename, _READERS, "read")].load(filename, **options)
+    mesh: _Mesh = _READERS[_suffix(filename, _READERS, "read")].load(
+        filename,
+        **options,
+    )
+    return mesh
 
 
 def save_mesh(

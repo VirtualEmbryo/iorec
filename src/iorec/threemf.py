@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2023-2026 the iorec authors
 """3MF files (.3mf) for 3D printing with Cura (Ultimaker), PrusaSlicer or Bambu Studio.
 
 A 3MF object is a closed, outward-oriented surface, so iorec writes one object per
@@ -19,9 +21,8 @@ from __future__ import annotations
 
 import warnings
 import zipfile
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from pathlib import Path
-from typing import Dict, List, Mapping, Tuple, Union
 from xml.etree import ElementTree
 
 import numpy as np
@@ -43,7 +44,7 @@ from iorec.rec_appendix import _iorec_version
 _SUFFIXES = (".3mf",)
 _CORE = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"
 _CURA = "http://software.ultimaker.com/xml/cura/3mf/2015/10"
-_IOREC = "https://src.koda.cnrs.fr/turlierlab/iorec"
+_IOREC = "https://github.com/VirtualEmbryo/iorec"
 _MODEL_REL = "http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"
 _PRODUCTION_PATH = (
     "{http://schemas.microsoft.com/3dmanufacturing/production/2015/06}path"
@@ -66,9 +67,9 @@ _RELS = (
 )
 
 # A mesh object (vertices, triangles, iorec label or None), or a list of components.
-_Part = Tuple[NDArray[np.float64], NDArray[np.int64], Union[int, None]]
-_Components = List[Tuple[str, NDArray[np.float64]]]
-_Objects = Dict[str, Union[_Part, _Components]]
+_Part = tuple[NDArray[np.float64], NDArray[np.int64], int | None]
+_Components = list[tuple[str, NDArray[np.float64]]]
+_Objects = dict[str, _Part | _Components]
 
 
 def save_3mf(
@@ -330,7 +331,7 @@ def _build_parts(
     source: Path,
 ) -> Iterator[_Part]:
     """Yield every mesh placed on the build plate, in world coordinates if asked."""
-    stack = [
+    stack: list[tuple[str, NDArray[np.float64], tuple[str, ...]]] = [
         (item.get("objectid", ""), _matrix(item.get("transform")), ())
         for item in reversed(list(root.iter(f"{{{_CORE}}}item")))
     ]

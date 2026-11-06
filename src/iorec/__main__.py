@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2023-2026 the iorec authors
 """Command line conversion between mesh formats: `iorec-convert SOURCE TARGET`.
 
 Also available as `python -m iorec SOURCE TARGET`. Examples::

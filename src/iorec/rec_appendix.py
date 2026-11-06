@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2023-2026 the iorec authors
 """Optional trailing metadata appendix for .rec/.arec files.
 
 The appendix is a block of ASCII `# key = value` lines written strictly after the

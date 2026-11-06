@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2023-2026 the iorec authors
 """Surface Evolver datafiles (.fe) and dumps (.dmp), 3D soapfilm linear model.
 
 A Surface Evolver body is a material region: body ``k`` lists its boundary facets,
@@ -15,8 +17,9 @@ groups) raise `MeshFormatError`.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping, Tuple, Union
+from typing import Any
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -29,7 +32,7 @@ from iorec.rec_appendix import _iorec_version
 _SUFFIXES = (".fe", ".dmp")
 _FACETS_PER_LINE = 16
 
-Tensions = Union[float, ArrayLike, Mapping[Tuple[int, int], float]]
+Tensions = float | ArrayLike | Mapping[tuple[int, int], float]
 
 
 def load_fe(

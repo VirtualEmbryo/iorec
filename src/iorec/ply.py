@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2023-2026 the iorec authors
 """PLY files (.ply): the labelled nonmanifold mesh for MeshLab, ParaView or Blender.
 
 iorec writes a `vertex` element (x, y, z as double) and a `face` element with the
@@ -15,7 +17,7 @@ get labels (1, 0): one region inside, the exterior outside.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -48,8 +50,8 @@ _ENDIAN = {"binary_little_endian": "<", "binary_big_endian": ">", "ascii": None}
 _INDEX_NAMES = ("vertex_indices", "vertex_index")
 
 # One property: (name, value type, count type for a list property or None).
-_Property = Tuple[str, str, Optional[str]]
-_Element = Tuple[str, int, List[_Property]]
+_Property = tuple[str, str, str | None]
+_Element = tuple[str, int, list[_Property]]
 
 
 def save_ply(
@@ -268,7 +270,7 @@ def _binary_element(
         return {name: np.empty(0) for name, _, _ in properties}, offset
     lengths = _first_list_lengths(data, offset, properties, endian)
     fields: list[tuple[Any, ...]] = []
-    for (name, value_type, count_type), length in zip(properties, lengths):
+    for (name, value_type, count_type), length in zip(properties, lengths, strict=True):
         if count_type is None:
             fields.append((name, endian + value_type))
         else:
@@ -281,7 +283,7 @@ def _binary_element(
     block = np.frombuffer(data, dtype=dtype, count=count, offset=offset)
     uniform = all(
         (block[f"{name}#count"] == length).all()
-        for (name, _, count_type), length in zip(properties, lengths)
+        for (name, _, count_type), length in zip(properties, lengths, strict=True)
         if count_type is not None
     )
     if not uniform:
@@ -355,7 +357,7 @@ def _text_element(
     table = block.reshape(count, width)
     element: dict[str, Any] = {}
     column = 0
-    for (name, _, count_type), length in zip(properties, lengths):
+    for (name, _, count_type), length in zip(properties, lengths, strict=True):
         if count_type is None:
             element[name] = table[:, column]
             column += 1

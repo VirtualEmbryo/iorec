@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2023-2026 the iorec authors
 """Shared mesh helpers for the exchange formats: input checks, cell shells, merging.
 
 A multimaterial mesh is stored once, nonmanifold: each triangle separates the label
@@ -65,7 +67,7 @@ def _label_sides(
     values, starts = np.unique(flat[order], return_index=True)
     ends = np.append(starts[1:], len(flat))
     sides = []
-    for label, start, end in zip(values.tolist(), starts, ends):
+    for label, start, end in zip(values.tolist(), starts, ends, strict=True):
         if exterior_label is not None and label == exterior_label:
             continue
         indices = order[start:end]

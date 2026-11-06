@@ -1,10 +1,13 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2023-2026 the iorec authors
 """Shared helpers for .rec/.arec files, used by both the 2D and 3D readers."""
 
 from __future__ import annotations
 
 import warnings
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, TextIO
+from typing import Any, TextIO
 
 import numpy as np
 from numpy.typing import NDArray

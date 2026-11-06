@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2023-2026 the iorec authors
 """Opt-in structural checks for .rec/.arec files, run by the readers on `validate=True`.
 
 Without `validate=True` the readers keep their historical, permissive behaviour: a

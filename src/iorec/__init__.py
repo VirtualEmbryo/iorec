@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2023-2026 the iorec authors
 """IO for multimaterial meshes: .rec (3D, 2D); Surface Evolver, PLY, OBJ, 3MF (3D).
 
 Matthieu Perez (2023)

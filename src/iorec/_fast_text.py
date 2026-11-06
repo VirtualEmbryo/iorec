@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2023-2026 the iorec authors
 """Optional fast parser for the geometry of text .rec/.arec files, based on pyarrow."""
 
 from __future__ import annotations

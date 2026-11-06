@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import configparser
+import os
 import shutil
 from pathlib import Path
 
@@ -78,19 +80,31 @@ def build(session: nox.Session) -> None:
     session.run("python", "-m", "build")
 
 
+def _publish_repository() -> str:
+    """Return the twine repository to upload to.
+
+    The value of $IOREC_REPOSITORY if set, else "koda" if ~/.pypirc defines a
+    [koda] section, else "pypi".
+    """
+    if "IOREC_REPOSITORY" in os.environ:
+        return os.environ["IOREC_REPOSITORY"]
+    pypirc = configparser.ConfigParser()
+    pypirc.read(Path("~/.pypirc").expanduser())
+    return "koda" if pypirc.has_section("koda") else "pypi"
+
+
 @nox.session
 def publish(session: nox.Session) -> None:
-    """Publish the built packages on the koda repository.
+    """Upload the built packages with twine.
 
-    You must have a koda entry in your ~/.pypirc
-    with access tokens for the package registry.
+    The target is chosen by _publish_repository; credentials come from ~/.pypirc.
     """
     dist_dir = DIR.joinpath("dist")
     if not dist_dir.exists():
         print(dist_dir.resolve(), "not found, have you built the package ?")
     else:
         session.install("twine")
-        session.run("twine", "upload", "--repository", "koda", "dist/*")
+        session.run("twine", "upload", "--repository", _publish_repository(), "dist/*")
 
 
 @nox.session

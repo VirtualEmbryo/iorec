@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2023-2026 the iorec authors
 """Wavefront OBJ files (.obj, with a .mtl of colours) for Blender and other 3D tools.
 
 The mesh is written as one OBJ object per group of triangles, each with a material of

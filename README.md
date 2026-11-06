@@ -9,25 +9,24 @@ below).
 
 ## Installation
 
-`uv add iorec` if you have configured uv,
-
-or
-
-`embryo-pip install iorec` if you have installed embryo-pip the old way.
+`pip install iorec`
 
 ## Usage
 
 Functions:
 
 For 3D .rec meshes:
+
 - iorec.load_rec()
 - iorec.save_rec()
 
 For 2D .rec meshes:
+
 - iorec.load_2d_rec()
 - iorec.save_2d_rec()
 
 Plus the optional metadata appendix (see below):
+
 - iorec.load_rec_appendix() — shared by both 2D and 3D
 - iorec.load_rec_with_metadata() — 3D, combines load_rec() and load_rec_appendix()
 - iorec.load_2d_rec_with_metadata() — 2D, combines load_2d_rec() and load_rec_appendix()
@@ -36,6 +35,7 @@ Every reader takes an optional `validate=True` and then raises `iorec.RecFormatE
 a malformed file (see "Validation on read" below).
 
 Other 3D formats (see "Other formats" below):
+
 - iorec.load_fe(), iorec.load_fe_with_attributes(), iorec.save_fe() — Surface Evolver
 - iorec.load_ply(), iorec.save_ply()
 - iorec.load_obj(), iorec.save_obj()
@@ -109,6 +109,7 @@ Save three numpy arrays of points, triangles and multi-material labels as a .rec
 The file can be in binary or text mode. Binary is more compact but might not be universally understood.
 
 Arguments are:
+
 - filename (str | Path): where to save the mesh file.
 - points (NDArray[np.float64]): Mesh points.
 - triangles (NDArray[np.int64]): Mesh triangles (topology).
@@ -136,7 +137,7 @@ points, triangles, labels = iorec.load_rec("tests/assets/text.rec")
 filename = "txt.rec"
 iorec.save_rec(filename, points, triangles, labels, binary_mode=False)
 
-# Check: if we load the saved mesh file, 
+# Check: if we load the saved mesh file,
 # we find back the original points, triangles and labels.
 saved_points, saved_triangles, saved_labels = iorec.load_rec(filename)
 
@@ -144,7 +145,6 @@ assert np.array_equal(points, saved_points)
 assert np.array_equal(triangles, saved_triangles)
 assert np.array_equal(labels, saved_labels)
 ```
-
 
 ### load_2d_rec
 
@@ -154,7 +154,6 @@ Similar to load_rec in 3D. See its documentation.
 import iorec
 points, segments, labels = iorec.load_2d_rec("tests/assets/text_2d.rec")
 ```
-
 
 ### save_2d_rec
 
@@ -248,12 +247,12 @@ and `labels` (m, 2), where the normal of triangle `i` (right-hand rule on its ve
 order) points **from `labels[i, 0]` to `labels[i, 1]`**. Label 0 is the exterior
 medium by default (`exterior_label=0` wherever it matters).
 
-| suffix | format | what is stored | round trip back to `.rec` |
-|---|---|---|---|
-| `.fe` (read also `.dmp`) | Surface Evolver datafile | one body per label, facet tensions, volume targets | same arrays, bit for bit |
-| `.ply` | PLY, binary or text | the nonmanifold mesh, labels as face properties `label0`, `label1` | same arrays, bit for bit |
-| `.obj` + `.mtl` | Wavefront OBJ | one coloured object per interface, or per cell | same mesh (*) |
-| `.3mf` | 3MF (3D printing) | one closed, outward surface per cell, colour, unit, scale, Cura extruder | same mesh (*) |
+| suffix                   | format                   | what is stored                                                           | round trip back to `.rec` |
+| ------------------------ | ------------------------ | ------------------------------------------------------------------------ | ------------------------- |
+| `.fe` (read also `.dmp`) | Surface Evolver datafile | one body per label, facet tensions, volume targets                       | same arrays, bit for bit  |
+| `.ply`                   | PLY, binary or text      | the nonmanifold mesh, labels as face properties `label0`, `label1`       | same arrays, bit for bit  |
+| `.obj` + `.mtl`          | Wavefront OBJ            | one coloured object per interface, or per cell                           | same mesh (*)             |
+| `.3mf`                   | 3MF (3D printing)        | one closed, outward surface per cell, colour, unit, scale, Cura extruder | same mesh (*)             |
 
 (*) Same points and labelled triangles, up to the order of triangles (and of vertices
 for 3MF) and the orientation convention: a triangle with labels `(b, a)`, `b > a`,
@@ -331,8 +330,8 @@ imports the geometry of a PLY but not its face properties: use OBJ for Blender.
 `save_obj` writes one OBJ object per interface (`interface_<a>_<b>`, a < b, normals
 from a to b), or with `group_by="cell"` one closed surface per cell (`cell_<k>`,
 normals outward; a triangle between two cells is then written in both). Each object
-gets a material of the same name and colour in the `.mtl` file. In Blender, *File >
-Import > Wavefront (.obj)* gives one coloured object per interface or per cell. Files
+gets a material of the same name and colour in the `.mtl` file. In Blender, _File >
+Import > Wavefront (.obj)_ gives one coloured object per interface or per cell. Files
 re-exported by Blender hold a copy of shared vertices in each object: read them with
 `load_obj(..., merge_vertices=True)`.
 
@@ -357,7 +356,7 @@ iorec.save_3mf("aggregate.3mf", points, triangles, labels, unit="millimeter",
                scale=100 / 6, extruders=extruders)
 ```
 
-Open the file in Cura (*File > Open*): Cura reads the extruder of each part from
+Open the file in Cura (_File > Open_): Cura reads the extruder of each part from
 `cura:extruder_nr` and keeps the parts together as a group. Other slicers
 (PrusaSlicer, Bambu Studio) read the parts and their colours; their extruders are set
 in the slicer.

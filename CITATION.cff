@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use iorec, please cite it as below."
+title: "iorec"
+abstract: "Load and save multimaterial meshes: .rec, Surface Evolver, PLY, OBJ, 3MF"
+type: software
+version: 1.4.0
+date-released: 2026-11-06
+license: GPL-3.0-or-later
+repository-code: "https://github.com/VirtualEmbryo/iorec"
+authors:
+  - family-names: Perez
+    given-names: Matthieu
+    orcid: "https://orcid.org/0000-0002-6760-439X"
+  - family-names: Turlier
+    given-names: Hervé
+    orcid: "https://orcid.org/0000-0002-9332-9125"

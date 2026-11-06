@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2023-2026 the iorec authors
 """Display colours for labels and interfaces, the same in every exported file.
 
 Each label gets a hue from the golden-angle sequence, so that any number of labels
@@ -34,7 +36,7 @@ def interface_color(
     if label_b == exterior_label:
         return label_color(label_a)
     color_a, color_b = label_color(label_a), label_color(label_b)
-    r, g, b = ((x + y) / 2 for x, y in zip(color_a, color_b))
+    r, g, b = ((x + y) / 2 for x, y in zip(color_a, color_b, strict=True))
     return r, g, b
 
 

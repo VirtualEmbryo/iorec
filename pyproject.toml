@@ -4,23 +4,16 @@ build-backend = "hatchling.build"
 
 
 [project]
-name = "iorec"    # you'll be able to pip install this name
-version = "1.3.0"
-# Who is an author or a maintainer ? There's no official definition.
+name = "iorec"
+version = "1.4.0"
 authors = [{ name = "Matthieu Perez", email = "matthieu.perez@cnrs.fr" }]
 maintainers = [{ name = "Matthieu Perez", email = "matthieu.perez@cnrs.fr" }]
 description = "Load and save multimaterial meshes: .rec, Surface Evolver, PLY, OBJ, 3MF"
-readme = "README.md"                                                          # The long description is in this file
-license = "GPL-3.0-or-later"                                                  # SPDX expression (PEP 639)
+readme = "README.md"
+license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
-requires-python = ">=3.8"                                                     # best if only minimal version is specified
+requires-python = ">=3.13"
 
-# list of valid classifiers: https://pypi.org/classifiers/
-#  At least put:
-#  - which version(s) of Python your package works on,
-#  - which operating systems your package will work on.
-#  - (the license is declared by `license` above: PEP 639 forbids license classifiers
-#    next to a license expression)
 classifiers = [
   "Development Status :: 4 - Beta",
   "Intended Audience :: Science/Research",
@@ -35,7 +28,6 @@ classifiers = [
   "Typing :: Typed",
 ]
 
-# The project packages requirements
 dependencies = ["numpy"]
 
 # Optional installations
@@ -51,10 +43,10 @@ dev = ["iorec[test]", "pipx", "nox", "mypy", "ruff"]
 iorec-convert = "iorec.__main__:main"
 
 [project.urls]
-Homepage = "https://src.koda.cnrs.fr/turlierlab/iorec"
-"Bug Tracker" = "https://src.koda.cnrs.fr/turlierlab/iorec/issues"
-Discussions = "https://src.koda.cnrs.fr/turlierlab/iorec/discussions"
-Changelog = "https://src.koda.cnrs.fr/turlierlab/iorec/releases"
+Homepage = "https://github.com/VirtualEmbryo/iorec"
+"Bug Tracker" = "https://github.com/VirtualEmbryo/iorec/issues"
+Discussions = "https://github.com/VirtualEmbryo/iorec/discussions"
+Changelog = "https://github.com/VirtualEmbryo/iorec/releases"
 [tool.hatch]
 envs.default.dependencies = ["pytest", "pytest-cov"]
 
@@ -101,7 +93,7 @@ exclude = [
 
 line-length = 88
 
-target-version = "py38"
+target-version = "py313"
 
 [tool.ruff.lint]
 # Enable the pycodestyle (`E`) and Pyflakes (`F`) rules by default.
@@ -151,7 +143,7 @@ convention = "google"
 
 [tool.black]
 line-length = 88
-target-version = ['py38']
+target-version = ['py313']
 include = '\.pyi?$'
 # 'extend-exclude' excludes files or directories in addition to the defaults
 extend-exclude = '''
@@ -167,11 +159,7 @@ profile = "black"
 
 [tool.mypy]
 files = "src"
-# Not 3.8 (the package's own minimum): current mypy refuses to type-check below 3.10,
-# and numpy's installed stubs use `type` statements (PEP 695, 3.12+) that mypy can't
-# parse under an older target. This only affects the type-checking target, not the
-# package's runtime python_requires.
-python_version = "3.12"
+python_version = "3.13"
 warn_unused_configs = true
 strict = true
 show_error_codes = true

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2023-2026 the iorec authors
 """Parser of Surface Evolver datafiles and dumps into labelled triangles.
 
 The text is cleaned of comments, then cut into its header and element sections. A
@@ -11,7 +13,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -45,11 +47,11 @@ _KEYWORD_LINE = re.compile(
 _WHITESPACE = str.maketrans(",;:", "   ")
 
 # (line number, tokens) of each element line.
-_Rows = List[Tuple[int, List[str]]]
+_Rows = list[tuple[int, list[str]]]
 # Text of a section and the number of its first line.
-_Section = Tuple[str, int]
-_Mesh = Tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64], Dict[str, Any]]
-_Loops = Union[NDArray[np.int64], List[List[str]]]
+_Section = tuple[str, int]
+_Mesh = tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.int64], dict[str, Any]]
+_Loops = NDArray[np.int64] | list[list[str]]
 
 
 def parse_evolver(text: str, source: Path, exterior_label: int) -> _Mesh:
