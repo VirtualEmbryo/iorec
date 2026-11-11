@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import io
 import struct
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -31,7 +32,11 @@ from iorec._validation import (
     _check_mesh,
     _check_text_tail,
 )
-from iorec.rec_appendix import _appendix_marker, _split_rec_bytes
+from iorec.rec_appendix import (
+    _DEFAULT_APPENDIX_VERSION,
+    _appendix_marker,
+    _split_rec_bytes,
+)
 
 
 def load_2d_rec(
@@ -67,6 +72,7 @@ def load_2d_rec_with_metadata(
     filename: str | Path,
     *,
     validate: bool = False,
+    metadata_types: Mapping[str, object] | None = None,
 ) -> tuple[
     NDArray[np.float64],
     NDArray[np.int64],
@@ -83,6 +89,8 @@ def load_2d_rec_with_metadata(
         filename (str | Path): The path to the file on disk.
         validate (bool, optional): Check the geometry as `load_2d_rec` does with
             `validate=True`. Defaults to False.
+        metadata_types: version-1 appendices only, the type of named keys, as in
+            `load_rec_appendix`.
 
     Raises:
         ValueError: If the path given is not a .rec or .arec file.
@@ -96,7 +104,10 @@ def load_2d_rec_with_metadata(
         `load_rec_appendix` (`None` if the file has no appendix).
     """
     filename = _resolve_rec_path(filename)
-    geometry_bytes, metadata = _split_rec_bytes(filename.read_bytes())
+    geometry_bytes, metadata = _split_rec_bytes(
+        filename.read_bytes(),
+        metadata_types,
+    )
 
     if _is_binary_bytes(geometry_bytes):
         points, segments, labels = _parse_2d_binary_rec_bytes(
@@ -328,6 +339,7 @@ def save_2d_rec(
     *,
     metadata: dict[str, Any] | None = None,
     written_by: str | None = None,
+    appendix_version: int = _DEFAULT_APPENDIX_VERSION,
 ) -> None:
     """Save a 2D rec mesh file at filename. Binary or text mode are available.
 
@@ -357,6 +369,9 @@ def save_2d_rec(
             version is stamped on a separate `writer_library` line instead, so both
             facts survive: what produced the mesh, and what serialised it. Has no
             effect if `metadata` is `None`, since no appendix is written in that case.
+        appendix_version (int, optional): appendix format, 1 (`key = text` lines)
+            or 2 (`key: JSON` lines, every value typed). Defaults to 1. No effect if
+            `metadata` is `None`.
     """
 
     def write_geometry() -> None:
@@ -365,7 +380,13 @@ def save_2d_rec(
         else:
             _save_2d_rec_text(filename, points, segments, labels)
 
-    _write_geometry_with_appendix(filename, write_geometry, metadata, written_by)
+    _write_geometry_with_appendix(
+        filename,
+        write_geometry,
+        metadata,
+        written_by,
+        appendix_version,
+    )
 
 
 def _save_2d_rec_binary(
