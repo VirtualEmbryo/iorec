@@ -327,9 +327,9 @@ def test_version_2_refuses_values_json_cannot_hold(value: object) -> None:
         write_rec_appendix({"x": value}, written_by="test", appendix_version=2)
 
 
-@pytest.mark.parametrize("key", ["", "a b", "a:b", "a#b", "é", "a\tb"])
+@pytest.mark.parametrize("key", ["", "a b", "a:b", "a#b", "é", "a\tb", "spacing="])
 def test_version_2_refuses_keys_it_cannot_write(key: str) -> None:
-    """Keys must be non-empty ASCII without whitespace, ':' or '#'."""
+    """Keys must be non-empty ASCII without whitespace, ':', '#' or '='."""
     with pytest.raises(ValueError, match="cannot be written in appendix version 2"):
         write_rec_appendix({key: 1}, written_by="test", appendix_version=2)
 

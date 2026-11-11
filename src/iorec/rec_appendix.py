@@ -37,8 +37,9 @@ _APPENDIX_SEQUENCE_FLOAT_KEYS = frozenset({"spacing"})
 # `load_rec_appendix` straight back into `save_rec` doesn't duplicate or corrupt them.
 _APPENDIX_RESERVED_KEYS = frozenset({"written_by", "writer_library", "_version"})
 # Characters a version-2 key may not contain: the key/value separator, the comment
-# sign that starts every appendix line, and whitespace.
-_FORBIDDEN_KEY_CHARACTERS = frozenset(":#") | frozenset(" \t\r\n\f\v")
+# sign that starts every appendix line, whitespace, and the version-1 separator `=`
+# (older readers split each line on its first `=`).
+_FORBIDDEN_KEY_CHARACTERS = frozenset(":#=") | frozenset(" \t\r\n\f\v")
 _TRUE_TEXTS = frozenset({"True", "true", "1"})
 _FALSE_TEXTS = frozenset({"False", "false", "0"})
 
@@ -110,7 +111,7 @@ def _check_version_2_key(key: object) -> str:
     ):
         error = (
             f"Metadata key {key!r} cannot be written in appendix version 2: a key is "
-            "a non-empty ASCII string without whitespace, ':' or '#'."
+            "a non-empty ASCII string without whitespace, ':', '#' or '='."
         )
         raise ValueError(error)
     return key
@@ -156,7 +157,7 @@ def write_rec_appendix(
     Raises:
         UnicodeEncodeError: in version 1, if a value contains a non-ASCII character.
         ValueError: if `appendix_version` is not 1 or 2; in version 2, for a key that
-            is empty, non-ASCII or contains whitespace, ':' or '#', or for a NaN or
+            is empty, non-ASCII or contains whitespace, ':', '#' or '=', or for a NaN or
             infinite number.
         TypeError: in version 2, for a value JSON cannot hold (e.g. `None`).
 
