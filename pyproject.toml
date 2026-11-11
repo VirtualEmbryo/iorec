@@ -12,7 +12,7 @@ description = "Load and save multimaterial meshes: .rec, Surface Evolver, PLY, O
 readme = "README.md"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -22,6 +22,7 @@ classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
   "Topic :: Scientific/Engineering",
@@ -93,7 +94,7 @@ exclude = [
 
 line-length = 88
 
-target-version = "py313"
+target-version = "py312"
 
 [tool.ruff.lint]
 # Enable the pycodestyle (`E`) and Pyflakes (`F`) rules by default.
@@ -143,7 +144,7 @@ convention = "google"
 
 [tool.black]
 line-length = 88
-target-version = ['py313']
+target-version = ['py312']
 include = '\.pyi?$'
 # 'extend-exclude' excludes files or directories in addition to the defaults
 extend-exclude = '''
@@ -159,7 +160,7 @@ profile = "black"
 
 [tool.mypy]
 files = "src"
-python_version = "3.13"
+python_version = "3.12"
 warn_unused_configs = true
 strict = true
 show_error_codes = true
