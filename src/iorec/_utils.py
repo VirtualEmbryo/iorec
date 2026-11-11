@@ -19,7 +19,11 @@ from iorec._validation import (
     _check_text_tail,
     _parse_count,
 )
-from iorec.rec_appendix import _iorec_version, write_rec_appendix
+from iorec.rec_appendix import (
+    _DEFAULT_APPENDIX_VERSION,
+    _iorec_version,
+    write_rec_appendix,
+)
 
 _SUFFIXES = (".rec", ".arec")
 
@@ -49,6 +53,7 @@ def _write_geometry_with_appendix(
     write_geometry: Callable[[], None],
     metadata: dict[str, Any] | None,
     written_by: str | None = None,
+    appendix_version: int = _DEFAULT_APPENDIX_VERSION,
 ) -> None:
     """Write geometry, then an optional trailing metadata appendix.
 
@@ -63,12 +68,17 @@ def _write_geometry_with_appendix(
     appendix_bytes = None
     if metadata is not None:
         if written_by is None:
-            appendix_bytes = write_rec_appendix(metadata, written_by=_iorec_version())
+            appendix_bytes = write_rec_appendix(
+                metadata,
+                written_by=_iorec_version(),
+                appendix_version=appendix_version,
+            )
         else:
             appendix_bytes = write_rec_appendix(
                 metadata,
                 written_by=written_by,
                 writer_library=f"iorec {_iorec_version()}",
+                appendix_version=appendix_version,
             )
 
     write_geometry()

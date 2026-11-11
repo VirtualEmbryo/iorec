@@ -119,6 +119,7 @@ Arguments are:
   below). Defaults to None (no appendix).
 - written_by (str, optional, keyword only): name and version of the program that
   produced the mesh, stamped in the appendix. Defaults to None (iorec's own version).
+- appendix_version (int, optional, keyword only): format of the appendix, 1 or 2 (see below). Defaults to 2.
 
 Arrays of other dtypes are converted to the file's types. Both modes store every value
 exactly: binary mode writes float64 coordinates, int64 indices and int32 labels,
@@ -182,25 +183,43 @@ assert np.array_equal(labels, saved_labels)
 `.rec`/`.arec` file: pass a `metadata={...}` dict, and read it back later with
 `iorec.load_rec_appendix(filename)`.
 
-The appendix is a trailing block of ASCII `# key = value` lines, written after the
-geometry data — never before it, because every reader (this one included, in both text
-and binary mode) reads a count and then exactly that many values, so a trailing block is
-invisible to it, while a leading one would break parsing outright:
+The appendix is a trailing block of ASCII `#` lines, written after the geometry data — never before it, because every reader (this one included, in both text and binary mode) reads a count and then exactly that many values, so a trailing block is invisible to it, while a leading one would break parsing outright. It exists in two versions, chosen with `appendix_version=` on `save_rec`/`save_2d_rec`; the readers recognise both.
+
+**Version 2 (the default)** writes one `# key: value` line per key, the value in JSON, so every value keeps its type:
+
+```
+# rec-appendix 2
+# written_by: "<iorec version>"
+# coordinate_frame: "voxel_index"
+# axis_order: "zyx"
+# spacing: [1.0, 0.325, 0.325]
+# spacing_unit: "\u00b5m"
+# source_shape: [194, 200, 199]
+# media: [0, 7]
+# unresolved_regions_voxels: {"3": 112, "9": 4}
+# enclosed_media_inscribed_radius: 3.5
+# resampled: true
+```
+
+A value is a number, a string, a boolean, a sequence (list, tuple, numpy array) or a mapping with string keys, nested at will; numpy scalars are written as Python numbers. It reads back with the same type, with every JSON array returned as a tuple (as version 1 returns its sequences), so a list written comes back as a tuple. Writing refuses, before any file is created, a NaN or infinite number (`ValueError`: JSON has neither), a value JSON cannot hold such as `None`, bytes or a set (`TypeError`), and a key that is empty, non-ASCII or contains whitespace, `:`, `#` or `=` (`ValueError`; older readers split a line on its first `=`). Strings may hold any character: non-ASCII characters and `#` are written as JSON escapes (`"µm"` as `"\u00b5m"` above), so the block stays ASCII and a value can never be mistaken for the start of an appendix.
+
+iorec 1.1.0 to 1.4.0 read the geometry of a version-2 file exactly, in 2D and 3D, text and binary, with or without `validate=True`. Their `load_rec_appendix` and `*_with_metadata` return without error, but with each whole version-2 line as a key (for instance `'spacing: [1.0, 0.325, 0.325]'`), so they see none of the version-2 fields. Write version 1 for readers that still use one of these releases.
+
+**Version 1** writes one `# key = value` line per key, with `str(value)` and sequences space-separated; values must be ASCII:
 
 ```
 # rec-appendix 1
-# written_by = iorec <version>
+# written_by = <iorec version>
 # coordinate_frame = voxel_index
-# axis_order = zyx
 # spacing = 1.0 0.325 0.325
-# spacing_unit = um
 # source_shape = 194 200 199
 # crop_offset = 0 0 0
+# media = 0 7
 ```
 
+`spacing`, `source_shape`, and `crop_offset` are parsed back as tuples of `float`/`int` if present; any other key comes back as a raw string, unless the reader names its type with `metadata_types=`, a map from key to `str`, `int`, `float`, `bool` (`True`/`False`, `true`/`false`, `1`/`0`), `tuple[X, ...]` (space-separated items of type X) or any function of the text. The map applies to version-1 files only, so a caller can pass the same map whatever the version of the file; keys absent from the file are ignored. A value that does not read as the type asked for raises `ValueError`, naming the key.
+
 The fields above are illustrative, not exhaustive — `metadata` accepts any keys.
-`spacing`, `source_shape`, and `crop_offset` are parsed back as tuples of `float`/`int`
-if present; any other key round-trips as a raw string.
 
 ```python
 import iorec
@@ -210,12 +229,18 @@ iorec.save_rec(
     points,
     triangles,
     labels,
-    metadata={"coordinate_frame": "voxel_index", "spacing": (1.0, 0.325, 0.325)},
+    metadata={"coordinate_frame": "voxel_index", "spacing": (1.0, 0.325, 0.325), "media": [0, 7]},
 )
 
 metadata = iorec.load_rec_appendix("mesh.rec")
-# metadata == {"_version": 1, "written_by": "iorec <version>",
-#              "coordinate_frame": "voxel_index", "spacing": (1.0, 0.325, 0.325)}
+# metadata == {"_version": 2, "written_by": "<iorec version>",
+#              "coordinate_frame": "voxel_index", "spacing": (1.0, 0.325, 0.325),
+#              "media": (0, 7)}
+
+# A version-1 file, typed by the caller:
+iorec.save_rec("old.rec", points, triangles, labels, metadata={"media": [0, 7]}, appendix_version=1)
+metadata = iorec.load_rec_appendix("old.rec", metadata_types={"media": tuple[int, ...]})
+# metadata["media"] == (0, 7); without metadata_types it would be the string "0 7"
 ```
 
 **A file with no appendix must be treated as carrying no metadata at all** —
@@ -223,8 +248,7 @@ metadata = iorec.load_rec_appendix("mesh.rec")
 feature existed (or without a `metadata` argument) has no appendix. In particular,
 `None` must never be treated as "isotropic/default spacing" or any other default value.
 
-Metadata values must be ASCII — a non-ASCII value raises before anything is written to
-disk. The `written_by`/`_version` keys are reserved for the appendix's own bookkeeping:
+In version 1, metadata values must be ASCII — a non-ASCII value raises before anything is written to disk. The `written_by`/`_version` keys are reserved for the appendix's own bookkeeping:
 they are ignored if present in a `metadata` dict you pass in, so a dict returned by
 `load_rec_appendix` can be fed straight back into `save_rec`/`save_2d_rec` without
 duplicating or corrupting them.
@@ -282,8 +306,7 @@ iorec-convert cells.rec cells.obj --group-by cell
 iorec-convert cells.rec cells.3mf --unit micron --scale 500 --extruder 3=1
 ```
 
-`iorec.convert` keeps the metadata appendix from `.rec` to `.rec`/`.arec`; the other
-formats do not hold it, and a warning says so.
+`iorec.convert` keeps the metadata appendix from `.rec` to `.rec`/`.arec`, in the version of the source; the other formats do not hold it, and a warning says so.
 
 ### Surface Evolver (`.fe`, `.dmp`)
 

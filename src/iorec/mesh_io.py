@@ -189,7 +189,11 @@ def _load_with_extras(
     kind = _kind_of(suffix)
     if suffix in _REC_SUFFIXES:
         *mesh, metadata = load_rec_with_metadata(source, **options)
-        return (*mesh, {} if metadata is None else {"metadata": metadata}, kind)
+        if metadata is None:
+            return (*mesh, {}, kind)
+        # Keep the appendix version, so that typed version-2 values stay typed.
+        extras = {"metadata": metadata, "appendix_version": metadata["_version"]}
+        return (*mesh, extras, kind)
     if suffix in surface_evolver._SUFFIXES:
         *mesh, attributes = surface_evolver.load_fe_with_attributes(source, **options)
         extras = {}
