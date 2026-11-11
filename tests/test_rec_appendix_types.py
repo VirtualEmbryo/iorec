@@ -224,6 +224,19 @@ def test_version_1_unusable_type_is_refused(kind: object) -> None:
         _parse_rec_appendix(block, {"media": kind})
 
 
+def test_default_version_is_2(tmp_path: Path) -> None:
+    """Without `appendix_version`, the writers write version 2."""
+    filename = tmp_path / "mesh.rec"
+    _save(3, filename, False, metadata={"media": [0, 7]})
+
+    assert b"# rec-appendix 2\n" in filename.read_bytes()
+    assert iorec.load_rec_appendix(filename) == {
+        "_version": 2,
+        "written_by": iorec.load_rec_appendix(filename)["written_by"],
+        "media": (0, 7),
+    }
+
+
 def test_version_2_pins_wire_format() -> None:
     """The version-2 block has an exact byte layout."""
     metadata = {

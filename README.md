@@ -119,7 +119,7 @@ Arguments are:
   below). Defaults to None (no appendix).
 - written_by (str, optional, keyword only): name and version of the program that
   produced the mesh, stamped in the appendix. Defaults to None (iorec's own version).
-- appendix_version (int, optional, keyword only): format of the appendix, 1 or 2 (see below). Defaults to 1.
+- appendix_version (int, optional, keyword only): format of the appendix, 1 or 2 (see below). Defaults to 2.
 
 Arrays of other dtypes are converted to the file's types. Both modes store every value
 exactly: binary mode writes float64 coordinates, int64 indices and int32 labels,
@@ -185,7 +185,7 @@ assert np.array_equal(labels, saved_labels)
 
 The appendix is a trailing block of ASCII `#` lines, written after the geometry data — never before it, because every reader (this one included, in both text and binary mode) reads a count and then exactly that many values, so a trailing block is invisible to it, while a leading one would break parsing outright. It exists in two versions, chosen with `appendix_version=` on `save_rec`/`save_2d_rec`; the readers recognise both.
 
-**Version 2** writes one `# key: value` line per key, the value in JSON, so every value keeps its type:
+**Version 2 (the default)** writes one `# key: value` line per key, the value in JSON, so every value keeps its type:
 
 ```
 # rec-appendix 2
@@ -205,7 +205,7 @@ A value is a number, a string, a boolean, a sequence (list, tuple, numpy array) 
 
 iorec 1.1.0 to 1.4.0 read the geometry of a version-2 file exactly, in 2D and 3D, text and binary, with or without `validate=True`. Their `load_rec_appendix` and `*_with_metadata` return without error, but with each whole version-2 line as a key (for instance `'spacing: [1.0, 0.325, 0.325]'`), so they see none of the version-2 fields. Write version 1 for readers that still use one of these releases.
 
-**Version 1 (the default)** writes one `# key = value` line per key, with `str(value)` and sequences space-separated; values must be ASCII:
+**Version 1** writes one `# key = value` line per key, with `str(value)` and sequences space-separated; values must be ASCII:
 
 ```
 # rec-appendix 1
@@ -230,7 +230,6 @@ iorec.save_rec(
     triangles,
     labels,
     metadata={"coordinate_frame": "voxel_index", "spacing": (1.0, 0.325, 0.325), "media": [0, 7]},
-    appendix_version=2,
 )
 
 metadata = iorec.load_rec_appendix("mesh.rec")
@@ -239,7 +238,7 @@ metadata = iorec.load_rec_appendix("mesh.rec")
 #              "media": (0, 7)}
 
 # A version-1 file, typed by the caller:
-iorec.save_rec("old.rec", points, triangles, labels, metadata={"media": [0, 7]})
+iorec.save_rec("old.rec", points, triangles, labels, metadata={"media": [0, 7]}, appendix_version=1)
 metadata = iorec.load_rec_appendix("old.rec", metadata_types={"media": tuple[int, ...]})
 # metadata["media"] == (0, 7); without metadata_types it would be the string "0 7"
 ```

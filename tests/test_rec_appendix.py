@@ -22,7 +22,7 @@ def test_write_parse_round_trip() -> None:
         "some_unknown_field": "kept-as-string",
     }
 
-    block = write_rec_appendix(metadata, written_by="test 0.0.0")
+    block = write_rec_appendix(metadata, written_by="test 0.0.0", appendix_version=1)
     parsed = _parse_rec_appendix(block.decode("ascii"))
 
     assert parsed["_version"] == 1
@@ -41,7 +41,7 @@ def test_write_rec_appendix_pins_wire_format() -> None:
     """
     metadata = {"coordinate_frame": "physical", "spacing": (1.0, 0.5)}
 
-    block = write_rec_appendix(metadata, written_by="test 0.0.0")
+    block = write_rec_appendix(metadata, written_by="test 0.0.0", appendix_version=1)
 
     expected = (
         b"# rec-appendix 1\n"
@@ -56,7 +56,7 @@ def test_write_rec_appendix_drops_reserved_keys() -> None:
     """`written_by`/`_version` in the metadata dict are ignored, not duplicated."""
     metadata = {"_version": 999, "written_by": "someone-else", "spacing_unit": "um"}
 
-    block = write_rec_appendix(metadata, written_by="test 0.0.0")
+    block = write_rec_appendix(metadata, written_by="test 0.0.0", appendix_version=1)
 
     assert block.count(b"written_by") == 1
     assert b"_version" not in block
@@ -69,7 +69,11 @@ def test_write_rec_appendix_drops_reserved_keys() -> None:
 def test_write_rec_appendix_rejects_non_ascii() -> None:
     """A non-ASCII metadata value raises before any file is written."""
     with pytest.raises(UnicodeEncodeError):
-        write_rec_appendix({"spacing_unit": "µm"}, written_by="test 0.0.0")
+        write_rec_appendix(
+            {"spacing_unit": "µm"},
+            written_by="test 0.0.0",
+            appendix_version=1,
+        )
 
 
 def test_write_rec_appendix_with_writer_library() -> None:
@@ -80,6 +84,7 @@ def test_write_rec_appendix_with_writer_library() -> None:
         metadata,
         written_by="my-pipeline 2.1.0",
         writer_library="iorec 1.0.9",
+        appendix_version=1,
     )
 
     expected = (
@@ -361,6 +366,7 @@ def test_save_rec_metadata_error_writes_no_file(tmp_path: Path) -> None:
             triangles,
             labels,
             metadata={"spacing_unit": "µm"},
+            appendix_version=1,
         )
 
     assert not filename.exists()

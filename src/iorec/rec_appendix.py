@@ -28,7 +28,7 @@ import numpy as np
 
 _APPENDIX_MAGIC = "rec-appendix"
 # Version written when the caller does not choose one.
-_DEFAULT_APPENDIX_VERSION = 1
+_DEFAULT_APPENDIX_VERSION = 2
 _APPENDIX_SEQUENCE_INT_KEYS = frozenset({"source_shape", "crop_offset"})
 _APPENDIX_SEQUENCE_FLOAT_KEYS = frozenset({"spacing"})
 # Bookkeeping keys, always emitted by `write_rec_appendix` itself (the header line, the
@@ -151,7 +151,7 @@ def write_rec_appendix(
             file. Lets both facts survive when `written_by` names something else (the
             program that produced the mesh): what produced it, and what wrote the
             bytes. Omitted entirely when `None`.
-        appendix_version: 1 or 2. Defaults to 1.
+        appendix_version: 1 or 2. Defaults to 2.
 
     Raises:
         UnicodeEncodeError: in version 1, if a value contains a non-ASCII character.

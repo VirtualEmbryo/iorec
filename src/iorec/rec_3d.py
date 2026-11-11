@@ -371,7 +371,7 @@ def save_rec(
             facts survive: what produced the mesh, and what serialised it. Has no
             effect if `metadata` is `None`, since no appendix is written in that case.
         appendix_version (int, optional): appendix format, 1 (`key = text` lines)
-            or 2 (`key: JSON` lines, every value typed). Defaults to 1. No effect if
+            or 2 (`key: JSON` lines, every value typed). Defaults to 2. No effect if
             `metadata` is `None`.
     """
 
