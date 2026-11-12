@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "iorec"
-version = "1.4.0"
+version = "1.4.1"
 authors = [{ name = "Matthieu Perez", email = "matthieu.perez@cnrs.fr" }]
 maintainers = [{ name = "Matthieu Perez", email = "matthieu.perez@cnrs.fr" }]
 description = "Load and save multimaterial meshes: .rec, Surface Evolver, PLY, OBJ, 3MF"
